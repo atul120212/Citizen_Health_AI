@@ -5,6 +5,7 @@ import { Room, RoomEvent, Track } from "livekit-client";
 import {
   Activity,
   Baby,
+  Bot,
   CalendarClock,
   Hospital,
   Languages,
@@ -18,7 +19,14 @@ import {
   Volume2
 } from "lucide-react";
 
-import { TurnResponse, createCitizen, createLiveKitToken, postTextTurn, postVoiceTurn } from "@/lib/api";
+import {
+  TurnResponse,
+  createCitizen,
+  createLiveKitToken,
+  postTextTurn,
+  postVoiceTurn,
+  startSession
+} from "@/lib/api";
 
 type SpeechState = {
   hasSpeech: boolean;
@@ -28,6 +36,12 @@ type SpeechState = {
   discard: boolean;
 };
 
+type ChatEntry = {
+  role: "agent" | "user";
+  text: string;
+  intent?: string;
+};
+
 const quickPrompts = [
   { icon: Hospital, label: "PHC counter", text: "Where is the registration counter?" },
   { icon: ShieldCheck, label: "Eligibility", text: "Am I eligible for Ayushman Bharat or CMCHIS?" },
@@ -35,12 +49,24 @@ const quickPrompts = [
   { icon: Baby, label: "ANC reminder", text: "Set my maternal health reminder for ANC visit." }
 ];
 
-const audioMimeType =
-  typeof window !== "undefined" && MediaRecorder.isTypeSupported("audio/webm;codecs=opus")
-    ? "audio/webm;codecs=opus"
-    : "audio/webm";
+// Probe at call-time so the check runs inside a user-gesture context after
+// the browser has fully initialised its codec registry.
+function getSupportedMimeType(): string {
+  const candidates = [
+    "audio/webm;codecs=opus",
+    "audio/webm",
+    "audio/ogg;codecs=opus",
+    "audio/mp4",
+  ];
+  for (const type of candidates) {
+    if (typeof MediaRecorder !== "undefined" && MediaRecorder.isTypeSupported(type)) {
+      return type;
+    }
+  }
+  return ""; // empty string → browser picks its own default
+}
 
-// VAD tuning: fast silence detection for low latency
+// VAD tuning — fast silence detection for low latency
 const SILENCE_MS = 650;
 const MIN_SPEECH_MS = 250;
 const MAX_TURN_MS = 14000;
@@ -54,14 +80,21 @@ export function VoiceConsole() {
   const [district, setDistrict] = useState("Chennai");
   const [phcName, setPhcName] = useState("T Nagar Urban Primary Health Centre");
   const [text, setText] = useState("Book a doctor appointment for tomorrow morning.");
-  const [turn, setTurn] = useState<TurnResponse | null>(null);
+
   const [status, setStatus] = useState("Ready");
   const [error, setError] = useState<string | null>(null);
   const [isLive, setIsLive] = useState(false);
   const [isProcessingTurn, setIsProcessingTurn] = useState(false);
   const [roomName, setRoomName] = useState<string | null>(null);
   const [agentState, setAgentState] = useState("Not connected");
-  const [voiceLevel, setVoiceLevel] = useState(0); // 0-1 RMS for pulse ring
+  const [voiceLevel, setVoiceLevel] = useState(0);
+
+  // Session and conversation history
+  const [sessionId, setSessionId] = useState<string | null>(null);
+  const [chatHistory, setChatHistory] = useState<ChatEntry[]>([]);
+
+  // Latest turn result (for result-grid display)
+  const [turn, setTurn] = useState<TurnResponse | null>(null);
 
   const roomRef = useRef<Room | null>(null);
   const micStreamRef = useRef<MediaStream | null>(null);
@@ -79,13 +112,13 @@ export function VoiceConsole() {
   const responseAudioRef = useRef<HTMLAudioElement | null>(null);
   const remoteAudioRef = useRef<HTMLDivElement | null>(null);
   const analyserRef = useRef<AnalyserNode | null>(null);
+  const chatEndRef = useRef<HTMLDivElement | null>(null);
 
-  const audioSrc = useMemo(() => {
-    if (!turn?.audio_base64) return null;
-    return `data:${turn.audio_mime_type};base64,${turn.audio_base64}`;
-  }, [turn]);
+  // Scroll chat to bottom whenever history grows
+  useEffect(() => {
+    chatEndRef.current?.scrollIntoView({ behavior: "smooth" });
+  }, [chatHistory]);
 
-  // Drive the pulse ring from the analyser independently of VAD logic
   const startLevelMeter = useCallback((analyser: AnalyserNode) => {
     analyserRef.current = analyser;
     const data = new Uint8Array(analyser.fftSize);
@@ -98,7 +131,6 @@ export function VoiceConsole() {
         sum += c * c;
       }
       const rms = Math.sqrt(sum / data.length);
-      // Smooth the value a little so the ring doesn't flicker
       setVoiceLevel((prev) => prev * 0.6 + rms * 0.4);
       levelAnimRef.current = requestAnimationFrame(tick);
     };
@@ -113,6 +145,10 @@ export function VoiceConsole() {
     }
     setVoiceLevel(0);
   }, []);
+
+  function pushChat(entry: ChatEntry) {
+    setChatHistory((prev) => [...prev, entry]);
+  }
 
   async function saveCitizen() {
     setError(null);
@@ -133,9 +169,12 @@ export function VoiceConsole() {
     const result = await postTextTurn({
       text: promptText,
       phone_number: phoneNumber,
-      language_code: languageCode
+      language_code: languageCode,
+      session_id: sessionId ?? undefined
     });
     setTurn(result);
+    pushChat({ role: "user", text: promptText });
+    pushChat({ role: "agent", text: result.response_text, intent: result.intent });
     await playBulbulAudio(result);
     setStatus(isLive ? "Listening" : "Ready");
   }
@@ -143,8 +182,6 @@ export function VoiceConsole() {
   async function startRealtime() {
     setError(null);
 
-    // navigator.mediaDevices is only available on secure origins (localhost or https://).
-    // Over plain HTTP on a LAN/remote IP the browser hides it entirely.
     if (typeof navigator === "undefined" || !navigator.mediaDevices?.getUserMedia) {
       throw new Error(
         "Microphone access is not available on this page. " +
@@ -152,11 +189,20 @@ export function VoiceConsole() {
       );
     }
 
+    // ── 1. Start session → get intro audio ───────────────────────
+    setStatus("Starting session");
+    const session = await startSession({
+      phone_number: phoneNumber,
+      language_code: languageCode
+    });
+    setSessionId(session.session_id);
+    pushChat({ role: "agent", text: session.intro_text });
+
+    // ── 2. Connect to LiveKit ─────────────────────────────────────
     setStatus("Joining LiveKit");
     setAgentState("Connecting");
-
     const nextRoomName = `citizen-health-${Date.now()}`;
-    const participantName = phoneNumber || `citizen-${Math.floor(Math.random() * 1000)}`;
+    const participantName = phoneNumber || `citizen-${Date.now()}`;
     const token = await createLiveKitToken(nextRoomName, participantName, {
       phone_number: phoneNumber,
       language_code: languageCode,
@@ -170,7 +216,6 @@ export function VoiceConsole() {
     room
       .on(RoomEvent.Connected, () => {
         setAgentState("LiveKit connected");
-        setStatus("Listening");
       })
       .on(RoomEvent.Reconnecting, () => {
         setAgentState("Reconnecting");
@@ -192,21 +237,15 @@ export function VoiceConsole() {
         if (track.kind === Track.Kind.Audio && remoteAudioRef.current) {
           remoteAudioRef.current.appendChild(track.attach());
         }
-      })
-      .on(RoomEvent.DataReceived, (payload, participant, _kind, topic) => {
-        if (topic !== "citizen-health-turn") return;
-        try {
-          const message = JSON.parse(new TextDecoder().decode(payload));
-          if (message.response_text) {
-            setAgentState(`${participant?.identity || "agent"} responded`);
-          }
-        } catch {
-          setAgentState("Agent data received");
-        }
       });
 
     await room.connect(token.url, token.token);
 
+    // ── 3. Play intro audio ───────────────────────────────────────
+    setStatus("Speaking");
+    await playIntroAudio(session);
+
+    // ── 4. Open mic and start VAD ─────────────────────────────────
     const stream = await navigator.mediaDevices.getUserMedia({
       audio: { echoCancellation: true, noiseSuppression: true, autoGainControl: true }
     });
@@ -221,7 +260,19 @@ export function VoiceConsole() {
     setIsLive(true);
     setStatus("Listening");
     setAgentState("Mic streaming through LiveKit");
-    startAutoTurnRecorder(stream);
+    startAutoTurnRecorder(stream, session.session_id);
+  }
+
+  async function playIntroAudio(session: { audio_base64: string | null; audio_mime_type: string }) {
+    if (!session.audio_base64) return;
+    responseAudioRef.current?.pause();
+    const audio = new Audio(`data:${session.audio_mime_type};base64,${session.audio_base64}`);
+    responseAudioRef.current = audio;
+    await new Promise<void>((resolve) => {
+      audio.onended = () => resolve();
+      audio.onerror = () => resolve();
+      audio.play().catch(() => resolve());
+    });
   }
 
   async function stopRealtime() {
@@ -238,9 +289,11 @@ export function VoiceConsole() {
     setStatus("Ready");
     setAgentState("Not connected");
     setRoomName(null);
+    setSessionId(null);
+    setChatHistory([]);
   }
 
-  function startAutoTurnRecorder(stream: MediaStream) {
+  function startAutoTurnRecorder(stream: MediaStream, sid: string) {
     if (!roomRef.current) return;
 
     stopCurrentRecorder();
@@ -253,15 +306,14 @@ export function VoiceConsole() {
       discard: false
     };
 
-    const recorder = new MediaRecorder(stream, { mimeType: audioMimeType });
+    const mimeType = getSupportedMimeType();
+    const recorder = new MediaRecorder(stream, mimeType ? { mimeType } : {});
     recorderRef.current = recorder;
 
     const audioContext = new AudioContext();
     const analyser = audioContext.createAnalyser();
     const source = audioContext.createMediaStreamSource(stream);
     source.connect(analyser);
-
-    // Start the visual level meter from this analyser
     startLevelMeter(analyser);
 
     recorder.ondataavailable = (event) => {
@@ -279,16 +331,12 @@ export function VoiceConsole() {
       chunksRef.current = [];
 
       if (state.discard || !roomRef.current || !state.hasSpeech || blob.size < 900) {
-        if (roomRef.current) {
-          window.setTimeout(() => startAutoTurnRecorder(stream), 150);
-        }
+        if (roomRef.current) window.setTimeout(() => startAutoTurnRecorder(stream, sid), 150);
         return;
       }
 
-      await sendVoiceTurn(blob);
-      if (roomRef.current) {
-        window.setTimeout(() => startAutoTurnRecorder(stream), 150);
-      }
+      await sendVoiceTurn(blob, sid);
+      if (roomRef.current) window.setTimeout(() => startAutoTurnRecorder(stream, sid), 150);
     };
 
     recorder.start(200);
@@ -306,8 +354,8 @@ export function VoiceConsole() {
       analyser.getByteTimeDomainData(data);
       let sum = 0;
       for (const value of data) {
-        const centered = (value - 128) / 128;
-        sum += centered * centered;
+        const c = (value - 128) / 128;
+        sum += c * c;
       }
       const rms = Math.sqrt(sum / data.length);
       const now = performance.now();
@@ -321,12 +369,12 @@ export function VoiceConsole() {
 
       const speechDuration = now - state.startedAt;
       const silenceDuration = now - state.lastVoiceAt;
-      const shouldCloseTurn =
+      const shouldClose =
         (state.hasSpeech && speechDuration > MIN_SPEECH_MS && silenceDuration > SILENCE_MS) ||
         (state.hasSpeech && speechDuration > MAX_TURN_MS) ||
         (!state.hasSpeech && now - state.startedAt > NO_SPEECH_ROLLOVER_MS);
 
-      if (shouldCloseTurn) {
+      if (shouldClose) {
         state.stopped = true;
         recorder.stop();
         return;
@@ -338,12 +386,16 @@ export function VoiceConsole() {
     animationRef.current = window.requestAnimationFrame(tick);
   }
 
-  async function sendVoiceTurn(blob: Blob) {
+  async function sendVoiceTurn(blob: Blob, sid: string) {
     setIsProcessingTurn(true);
     setStatus("Thinking");
     try {
-      const result = await postVoiceTurn(blob, phoneNumber);
+      const result = await postVoiceTurn(blob, phoneNumber, sid);
       setTurn(result);
+      if (result.transcript) {
+        pushChat({ role: "user", text: result.transcript });
+      }
+      pushChat({ role: "agent", text: result.response_text, intent: result.intent });
       setStatus("Speaking");
       await playBulbulAudio(result);
     } catch (err) {
@@ -357,11 +409,9 @@ export function VoiceConsole() {
 
   async function playBulbulAudio(result: TurnResponse) {
     if (!result.audio_base64) return;
-
     responseAudioRef.current?.pause();
     const audio = new Audio(`data:${result.audio_mime_type};base64,${result.audio_base64}`);
     responseAudioRef.current = audio;
-
     await new Promise<void>((resolve) => {
       audio.onended = () => resolve();
       audio.onerror = () => resolve();
@@ -405,7 +455,6 @@ export function VoiceConsole() {
     }
   }
 
-  // Cleanup on unmount
   useEffect(() => {
     return () => {
       stopCurrentRecorder(true);
@@ -416,16 +465,20 @@ export function VoiceConsole() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  // Compute pulse ring scale: 1.0 at silence, up to 1.45 when loud
   const pulseScale = 1 + Math.min(voiceLevel * 8, 0.45);
   const pulseOpacity = isLive ? Math.min(0.2 + voiceLevel * 6, 0.7) : 0;
 
-  // Mic is blocked on non-localhost HTTP origins by the browser
   const micUnavailable =
     typeof window !== "undefined" &&
     window.location.protocol === "http:" &&
     window.location.hostname !== "localhost" &&
     window.location.hostname !== "127.0.0.1";
+
+  // Audio player for last turn (shown in chat bubble)
+  const audioSrc = useMemo(() => {
+    if (!turn?.audio_base64) return null;
+    return `data:${turn.audio_mime_type};base64,${turn.audio_base64}`;
+  }, [turn]);
 
   return (
     <main className="shell">
@@ -447,6 +500,7 @@ export function VoiceConsole() {
       </header>
 
       <section className="workspace">
+        {/* ── Left panel: citizen profile ───────────────────────── */}
         <aside className="profile-panel">
           <div className="panel-heading">
             <UserRound size={18} />
@@ -482,6 +536,7 @@ export function VoiceConsole() {
           </button>
         </aside>
 
+        {/* ── Centre panel: voice + chat ────────────────────────── */}
         <section className="assistant-panel">
           <div className="intent-strip">
             {quickPrompts.map((prompt) => {
@@ -502,9 +557,9 @@ export function VoiceConsole() {
             })}
           </div>
 
+          {/* Mic + language line */}
           <div className="voice-stage">
             <div className="mic-wrapper">
-              {/* Pulse ring driven by live voice level */}
               <div
                 className="pulse-ring"
                 style={{
@@ -526,14 +581,36 @@ export function VoiceConsole() {
                 <Languages size={17} />
                 <span>{languageCode}</span>
               </div>
-              <p>
-                {turn?.response_text ||
-                  "Tap the mic once. LiveKit streams your voice, silence ends each turn, and Bulbul speaks the reply."}
+              <p className="stage-hint">
+                {isLive
+                  ? "Listening — speak naturally. Silence ends each turn automatically."
+                  : "Tap the mic to start. The agent will introduce itself, then listen."}
               </p>
               {audioSrc && <audio controls src={audioSrc} />}
             </div>
           </div>
 
+          {/* Conversation history */}
+          {chatHistory.length > 0 && (
+            <div className="chat-history">
+              {chatHistory.map((entry, i) => (
+                <div key={i} className={`chat-bubble chat-bubble--${entry.role}`}>
+                  <div className="chat-avatar">
+                    {entry.role === "agent" ? <Bot size={15} /> : <UserRound size={15} />}
+                  </div>
+                  <div className="chat-body">
+                    {entry.intent && entry.role === "agent" && (
+                      <span className="chat-intent">{entry.intent.replace(/_/g, " ")}</span>
+                    )}
+                    <p>{entry.text}</p>
+                  </div>
+                </div>
+              ))}
+              <div ref={chatEndRef} />
+            </div>
+          )}
+
+          {/* Text test row */}
           <div className="text-row">
             <input value={text} onChange={(e) => setText(e.target.value)} />
             <button className="primary-button" onClick={() => runSafely(() => submitText())}>
@@ -542,6 +619,7 @@ export function VoiceConsole() {
             </button>
           </div>
 
+          {/* Latest turn metadata */}
           {turn && (
             <div className="result-grid">
               <div>
@@ -570,6 +648,7 @@ export function VoiceConsole() {
           {error && <div className="error-box">{error}</div>}
         </section>
 
+        {/* ── Right panel: realtime state ───────────────────────── */}
         <aside className="livekit-panel">
           <div className="panel-heading">
             <Activity size={18} />
@@ -582,6 +661,10 @@ export function VoiceConsole() {
           <div className="metric">
             <span>Room</span>
             <strong>{roomName || "None"}</strong>
+          </div>
+          <div className="metric">
+            <span>Session</span>
+            <strong>{sessionId ? sessionId.slice(0, 8) + "…" : "None"}</strong>
           </div>
           <div className="metric">
             <span>Turn mode</span>

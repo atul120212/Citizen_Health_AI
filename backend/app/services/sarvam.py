@@ -55,7 +55,13 @@ class SarvamService:
             response.raise_for_status()
             return response.json()
 
-    async def classify_and_reply(self, transcript: str, language_code: str, context: dict[str, Any]) -> dict[str, Any]:
+    async def classify_and_reply(
+        self,
+        transcript: str,
+        language_code: str,
+        context: dict[str, Any],
+        history: list[dict[str, str]] | None = None,
+    ) -> dict[str, Any]:
         if not self.configured:
             return self._fallback_turn(transcript, language_code)
 
@@ -64,14 +70,26 @@ class SarvamService:
             "language_code": language_code,
             "citizen_context": context,
         }
+
+        # Build messages: system prompt → prior conversation history → current turn.
+        # History entries are plain {"role": "user"|"assistant", "content": str} dicts
+        # that the LLM uses to maintain context across multiple speech turns.
+        messages: list[dict[str, str]] = [{"role": "system", "content": SYSTEM_PROMPT}]
+        if history:
+            messages.extend(history)
+        messages.append(
+            {"role": "user", "content": json.dumps(user_content, ensure_ascii=False, default=_json_default)}
+        )
+
         payload = {
             "model": self.settings.sarvam_chat_model,
             "temperature": 0.2,
-            "max_tokens": 700,
-            "messages": [
-                {"role": "system", "content": SYSTEM_PROMPT},
-                {"role": "user", "content": json.dumps(user_content, ensure_ascii=False, default=_json_default)},
-            ],
+            # sarvam-30b is a reasoning model: it writes internal chain-of-thought
+            # (reasoning_content) before emitting the final JSON (content).
+            # 700 tokens was exhausted during reasoning, leaving content=null.
+            # 2048 gives enough room for both reasoning and the JSON reply.
+            "max_tokens": 2048,
+            "messages": messages,
         }
 
         async with httpx.AsyncClient(timeout=45) as client:

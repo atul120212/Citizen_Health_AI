@@ -24,10 +24,23 @@ class AppointmentCreate(BaseModel):
     reason: str
 
 
+class SessionStartRequest(BaseModel):
+    phone_number: str | None = None
+    language_code: str | None = None
+
+
+class SessionStartResponse(BaseModel):
+    session_id: str
+    intro_text: str
+    audio_base64: str | None = None
+    audio_mime_type: str = "audio/wav"
+
+
 class TextTurnRequest(BaseModel):
     text: str
     phone_number: str | None = None
     language_code: str | None = None
+    session_id: str | None = None
 
 
 class VoiceTurnResponse(BaseModel):

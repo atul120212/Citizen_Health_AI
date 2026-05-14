@@ -357,6 +357,95 @@ audio {
   overflow-wrap: anywhere;
 }
 
+.stage-hint {
+  color: var(--muted);
+  font-size: clamp(0.9rem, 1.5vw, 1.1rem);
+  line-height: 1.4;
+}
+
+/* ── Conversation chat history ─────────────────────────────────── */
+.chat-history {
+  background: #fbfcfa;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  max-height: 360px;
+  overflow-y: auto;
+  padding: 14px;
+  scroll-behavior: smooth;
+}
+
+.chat-bubble {
+  display: flex;
+  gap: 10px;
+  max-width: 92%;
+}
+
+.chat-bubble--agent {
+  align-self: flex-start;
+}
+
+.chat-bubble--user {
+  align-self: flex-end;
+  flex-direction: row-reverse;
+}
+
+.chat-avatar {
+  align-items: center;
+  background: var(--line);
+  border-radius: 999px;
+  display: flex;
+  flex-shrink: 0;
+  height: 28px;
+  justify-content: center;
+  width: 28px;
+}
+
+.chat-bubble--agent .chat-avatar {
+  background: #e7eee9;
+  color: var(--green-dark);
+}
+
+.chat-bubble--user .chat-avatar {
+  background: #e8edf6;
+  color: var(--blue);
+}
+
+.chat-body {
+  background: var(--panel);
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  padding: 10px 12px;
+}
+
+.chat-bubble--agent .chat-body {
+  border-radius: 2px 8px 8px 8px;
+}
+
+.chat-bubble--user .chat-body {
+  background: #eef2fa;
+  border-color: #d0daf0;
+  border-radius: 8px 2px 8px 8px;
+  text-align: right;
+}
+
+.chat-intent {
+  color: var(--green);
+  display: block;
+  font-size: 0.7rem;
+  font-weight: 700;
+  margin-bottom: 4px;
+  text-transform: uppercase;
+}
+
+.chat-body p {
+  font-size: 0.92rem;
+  line-height: 1.45;
+  margin: 0;
+}
+
 .remote-audio {
   display: none;
 }
