@@ -27,6 +27,13 @@ class Settings(BaseSettings):
     pool_min_size: int = Field(default=1, ge=0)
     pool_max_size: int = Field(default=5, ge=1)
 
+    # Email (SMTP) — leave blank to run in demo/log-only mode
+    smtp_host: str = "smtp.gmail.com"
+    smtp_port: int = 587
+    smtp_user: str | None = None
+    smtp_password: str | None = None
+    smtp_from: str = "Citizen Health AI <noreply@citizenhealth.ai>"
+
     model_config = SettingsConfigDict(env_file=(".env", "../.env"), env_file_encoding="utf-8", extra="ignore")
 
 

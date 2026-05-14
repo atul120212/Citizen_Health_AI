@@ -92,7 +92,12 @@ async def create_appointment(payload: AppointmentCreate) -> dict[str, Any] | Non
     )
 
 
-async def create_followup_appointment(citizen_id: str, reason: str) -> dict[str, Any] | None:
+async def create_followup_appointment(
+    citizen_id: str,
+    reason: str,
+    appointment_date: datetime | None = None,
+    appointment_time: str | None = None,
+) -> dict[str, Any] | None:
     worker = await db.fetch_one(
         """
         SELECT hw.id
@@ -104,7 +109,18 @@ async def create_followup_appointment(citizen_id: str, reason: str) -> dict[str,
         """,
         (citizen_id,),
     )
-    appointment_date = datetime.now(timezone.utc) + timedelta(days=1)
+
+    if appointment_date is None:
+        appointment_date = datetime.now(timezone.utc) + timedelta(days=1)
+
+    # If caller provided a time string like "10:30", merge it into the date
+    if appointment_time:
+        try:
+            hour, minute = (int(x) for x in appointment_time.split(":")[:2])
+            appointment_date = appointment_date.replace(hour=hour, minute=minute, second=0, microsecond=0)
+        except (ValueError, AttributeError):
+            pass
+
     return await create_appointment(
         AppointmentCreate(
             citizen_id=citizen_id,

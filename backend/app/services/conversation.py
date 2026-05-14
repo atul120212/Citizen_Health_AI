@@ -1,9 +1,11 @@
 import time
 import uuid
+from datetime import datetime, timezone
 from typing import Any
 
 from .. import db
 from ..schemas import SessionStartResponse, VoiceTurnResponse
+from .email_service import send_appointment_confirmation
 from .repository import (
     create_followup_appointment,
     create_interaction,
@@ -160,6 +162,7 @@ class ConversationService:
         context: dict[str, Any] = {
             "citizen": citizen,
             "db_configured": db.is_configured(),
+            "current_datetime": datetime.now(timezone.utc).isoformat(),
             "supported_services": [
                 "hospital_navigation",
                 "eligibility_check",
@@ -175,7 +178,7 @@ class ConversationService:
         turn = await self.sarvam.classify_and_reply(
             transcript, language_code, context, history=history
         )
-        actions = await self._apply_actions(turn, citizen)
+        actions = await self._apply_actions(turn, citizen, language_code=language_code)
 
         interaction = None
         if db.is_configured():
@@ -214,44 +217,88 @@ class ConversationService:
     # ------------------------------------------------------------------
 
     async def _apply_actions(
-        self, turn: dict[str, Any], citizen: dict[str, Any] | None
+        self,
+        turn: dict[str, Any],
+        citizen: dict[str, Any] | None,
+        language_code: str = "en-IN",
     ) -> list[dict[str, Any]]:
-        if not db.is_configured() or not citizen:
-            return []
-
         intent = turn["intent"]
         actions: list[dict[str, Any]] = []
 
-        if intent == "appointment_booking":
-            appointment = await create_followup_appointment(
-                citizen_id=citizen["id"],
-                reason=turn.get("appointment_reason") or "Citizen Health AI follow-up",
-            )
-            if appointment:
-                actions.append(
-                    {"type": "appointment_created", "appointment_id": appointment["id"]}
-                )
+        # ── Appointment booking ──────────────────────────────────────
+        # Only write to DB and send email when the user has confirmed
+        # all slots (confirmed=True, missing_slots=[]).
+        if intent == "appointment_booking" and turn.get("confirmed") and not turn.get("missing_slots"):
+            appt_date_str = turn.get("appointment_date")
+            appt_time_str = turn.get("appointment_time")
+            reason        = turn.get("appointment_reason") or "General consultation"
+            patient_name  = turn.get("patient_name") or (citizen["full_name"] if citizen else "Patient")
+            patient_email = turn.get("patient_email")
+            phc_name      = citizen.get("phc_name", "Your PHC") if citizen else "Your PHC"
 
-        if intent == "maternal_health_reminder":
+            # Parse ISO date string → datetime
+            appt_dt: datetime | None = None
+            if appt_date_str:
+                try:
+                    appt_dt = datetime.fromisoformat(appt_date_str).replace(tzinfo=timezone.utc)
+                except ValueError:
+                    appt_dt = None
+
+            if db.is_configured() and citizen:
+                appointment = await create_followup_appointment(
+                    citizen_id=citizen["id"],
+                    reason=reason,
+                    appointment_date=appt_dt,
+                    appointment_time=appt_time_str,
+                )
+                if appointment:
+                    actions.append({
+                        "type": "appointment_created",
+                        "appointment_id": appointment["id"],
+                        "date": appt_date_str,
+                        "time": appt_time_str,
+                        "reason": reason,
+                    })
+            else:
+                # Demo mode — record the booking details even without a DB
+                actions.append({
+                    "type": "appointment_created",
+                    "appointment_id": None,
+                    "date": appt_date_str,
+                    "time": appt_time_str,
+                    "reason": reason,
+                    "demo": True,
+                })
+
+            # Send confirmation email regardless of DB mode
+            if patient_email:
+                await send_appointment_confirmation(
+                    to_email=patient_email,
+                    patient_name=patient_name,
+                    reason=reason,
+                    date=appt_date_str or "TBD",
+                    time=appt_time_str or "TBD",
+                    phc=phc_name,
+                    language_code=language_code,
+                )
+                actions.append({"type": "email_sent", "to": patient_email})
+
+        if intent == "maternal_health_reminder" and db.is_configured() and citizen:
             reminder = await create_maternal_reminder(
                 citizen_id=citizen["id"],
                 reminder_type=turn.get("maternal_reminder_type") or "anc",
             )
             if reminder:
-                actions.append(
-                    {"type": "maternal_reminder_created", "reminder_id": reminder["id"]}
-                )
+                actions.append({"type": "maternal_reminder_created", "reminder_id": reminder["id"]})
 
-        if intent == "eligibility_check":
+        if intent == "eligibility_check" and db.is_configured() and citizen:
             eligible = bool(citizen.get("abha_id") or citizen.get("ayushman_status"))
             updated = await set_ayushman_precheck(citizen["id"], eligible)
-            actions.append(
-                {
-                    "type": "eligibility_precheck",
-                    "eligible": eligible,
-                    "citizen_id": updated["id"] if updated else citizen["id"],
-                }
-            )
+            actions.append({
+                "type": "eligibility_precheck",
+                "eligible": eligible,
+                "citizen_id": updated["id"] if updated else citizen["id"],
+            })
 
         if intent == "hospital_navigation":
             departments = await get_nearest_departments(turn.get("appointment_reason"))
@@ -271,25 +318,38 @@ class ConversationService:
         if intent == "appointment_booking" and any(
             a["type"] == "appointment_created" for a in actions
         ):
-            suffix = {
-                "ta-IN": " உங்கள் கோரிக்கை அருகிலுள்ள சுகாதார பணியாளருக்கு அனுப்பப்பட்டது.",
-                "kn-IN": " ನಿಮ್ಮ ವಿನಂತಿಯನ್ನು ಸಮೀಪದ ಆರೋಗ್ಯ ಕಾರ್ಯಕರ್ತರಿಗೆ ಕಳುಹಿಸಲಾಗಿದೆ.",
-                "hi-IN": " आपका अनुरोध नजदीकी स्वास्थ्य कार्यकर्ता को भेज दिया गया है।",
-            }.get(language_code, " Your request has been sent to the nearest health worker.")
+            email_sent = any(a["type"] == "email_sent" for a in actions)
+            if email_sent:
+                suffix = {
+                    "ta-IN": " உறுதிப்படுத்தல் மின்னஞ்சல் அனுப்பப்பட்டது.",
+                    "kn-IN": " ದೃಢೀಕರಣ email ಕಳುಹಿಸಲಾಗಿದೆ.",
+                    "hi-IN": " Confirmation email भेज दिया गया है।",
+                }.get(language_code, " A confirmation email has been sent to you.")
+            else:
+                suffix = {
+                    "ta-IN": " உங்கள் கோரிக்கை அருகிலுள்ள சுகாதார பணியாளருக்கு அனுப்பப்பட்டது.",
+                    "kn-IN": " ನಿಮ್ಮ ವಿನಂತಿಯನ್ನು ಸಮೀಪದ ಆರೋಗ್ಯ ಕಾರ್ಯಕರ್ತರಿಗೆ ಕಳುಹಿಸಲಾಗಿದೆ.",
+                    "hi-IN": " आपका अनुरोध नजदीकी स्वास्थ्य कार्यकर्ता को भेज दिया गया है।",
+                }.get(language_code, " Your request has been sent to the nearest health worker.")
             return response + suffix
         return response
 
+    # Indian language codes supported by the Sarvam TTS / STT stack.
+    _INDIAN_LANGS = {"te", "ml", "gu", "mr", "bn", "pa", "or", "as", "ur"}
+
     def _normalise_language(self, language_code: str) -> str:
-        language_code = language_code.lower().replace("_", "-")
-        if language_code.startswith("ta"):
+        code = language_code.lower().replace("_", "-")
+        if code.startswith("ta"):
             return "ta-IN"
-        if language_code.startswith("kn"):
+        if code.startswith("kn"):
             return "kn-IN"
-        if language_code.startswith("hi"):
+        if code.startswith("hi"):
             return "hi-IN"
-        if language_code.startswith("en"):
+        if code.startswith("en"):
             return "en-IN"
-        # Any other Indian language from Sarvam STT (te, ml, gu, mr, bn, …).
-        # Reconstruct as proper BCP-47 with uppercase region.
-        parts = language_code.split("-")
-        return f"{parts[0]}-{parts[1].upper()}" if len(parts) == 2 else f"{parts[0]}-IN"
+        # Pass through other Sarvam-supported Indian languages with proper casing.
+        prefix = code.split("-")[0]
+        if prefix in self._INDIAN_LANGS:
+            return f"{prefix}-IN"
+        # Anything else (fr, de, zh, …) → English
+        return "en-IN"
