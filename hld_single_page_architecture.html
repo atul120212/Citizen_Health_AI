@@ -1,0 +1,713 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Citizen Health AI Platform - Single Page HLD</title>
+<style>
+  :root {
+    --bg: #f6f8fb;
+    --ink: #172033;
+    --muted: #607086;
+    --line: #c8d3e2;
+    --blue: #1769e0;
+    --cyan: #0b84a5;
+    --violet: #6941c6;
+    --green: #14804a;
+    --amber: #b45309;
+    --red: #b42318;
+    --card: #ffffff;
+  }
+
+  * { box-sizing: border-box; }
+
+  body {
+    margin: 0;
+    background: var(--bg);
+    color: var(--ink);
+    font-family: Inter, "Segoe UI", Arial, sans-serif;
+  }
+
+  .page {
+    width: 1920px;
+    min-height: 1080px;
+    margin: 0 auto;
+    padding: 28px 34px 30px;
+    background:
+      linear-gradient(180deg, rgba(23, 105, 224, 0.05), rgba(20, 128, 74, 0.04)),
+      var(--bg);
+  }
+
+  .titlebar {
+    display: grid;
+    grid-template-columns: 1fr auto;
+    gap: 22px;
+    align-items: center;
+    padding: 20px 24px;
+    border: 1px solid #d7e1ee;
+    border-radius: 10px;
+    background: linear-gradient(135deg, #ffffff, #eef5ff);
+    box-shadow: 0 12px 30px rgba(20, 32, 50, 0.08);
+  }
+
+  h1 {
+    margin: 0;
+    font-size: 32px;
+    line-height: 1.08;
+    letter-spacing: 0;
+  }
+
+  .subtitle {
+    margin-top: 8px;
+    font-size: 15px;
+    color: var(--muted);
+  }
+
+  .chiprow {
+    display: flex;
+    gap: 8px;
+    flex-wrap: wrap;
+    justify-content: flex-end;
+    max-width: 650px;
+  }
+
+  .chip {
+    border: 1px solid #cdd9e8;
+    background: #fff;
+    color: #344054;
+    padding: 7px 11px;
+    border-radius: 999px;
+    font-size: 12px;
+    font-weight: 700;
+    white-space: nowrap;
+  }
+
+  .flow-ribbon {
+    margin-top: 14px;
+    padding: 12px 16px;
+    border: 1px solid #ccdaf0;
+    border-radius: 10px;
+    background: #ffffff;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 8px;
+    font-size: 13px;
+    color: #344054;
+    box-shadow: 0 8px 20px rgba(20, 32, 50, 0.05);
+  }
+
+  .flow-step {
+    padding: 6px 10px;
+    border-radius: 7px;
+    background: #eef5ff;
+    border: 1px solid #c7d9f6;
+    font-weight: 800;
+    white-space: nowrap;
+  }
+
+  .arrow {
+    color: var(--blue);
+    font-weight: 900;
+    font-size: 17px;
+  }
+
+  .architecture {
+    position: relative;
+    margin-top: 18px;
+    display: grid;
+    grid-template-columns: 1.02fr 1.15fr 1.8fr 1.08fr;
+    grid-template-rows: 142px 150px 174px 292px 152px 132px;
+    gap: 12px;
+  }
+
+  .layer {
+    border: 1px solid #d5deeb;
+    border-radius: 10px;
+    background: rgba(255, 255, 255, 0.93);
+    box-shadow: 0 10px 24px rgba(20, 32, 50, 0.06);
+    overflow: hidden;
+    min-width: 0;
+  }
+
+  .layer-head {
+    height: 32px;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 12px;
+    padding: 0 13px;
+    color: #fff;
+    font-size: 12px;
+    font-weight: 900;
+    letter-spacing: .7px;
+    text-transform: uppercase;
+  }
+
+  .layer-head span:last-child {
+    font-size: 10px;
+    opacity: .88;
+    font-weight: 800;
+  }
+
+  .head-user { background: linear-gradient(90deg, #155eef, #1769e0); }
+  .head-comm { background: linear-gradient(90deg, #087a94, #0b84a5); }
+  .head-voice { background: linear-gradient(90deg, #5f35b5, #7f56d9); }
+  .head-orch { background: linear-gradient(90deg, #0f6b45, #14804a); }
+  .head-services { background: linear-gradient(90deg, #93370d, #b45309); }
+  .head-rag { background: linear-gradient(90deg, #0c4a6e, #0b84a5); }
+  .head-data { background: linear-gradient(90deg, #354052, #475467); }
+  .head-analytics { background: linear-gradient(90deg, #0f6b45, #14804a); }
+  .head-infra { background: linear-gradient(90deg, #26364d, #344054); }
+  .head-security { background: linear-gradient(90deg, #912018, #b42318); }
+
+  .content {
+    padding: 11px;
+    height: calc(100% - 32px);
+  }
+
+  .grid2 { display: grid; grid-template-columns: repeat(2, 1fr); gap: 8px; height: 100%; }
+  .grid3 { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; height: 100%; }
+  .grid4 { display: grid; grid-template-columns: repeat(4, 1fr); gap: 8px; height: 100%; }
+  .stack { display: flex; flex-direction: column; gap: 8px; height: 100%; }
+  .row { display: flex; gap: 8px; align-items: stretch; height: 100%; }
+
+  .box {
+    border: 1px solid #d7e1ee;
+    border-radius: 8px;
+    background: #fff;
+    padding: 9px 10px;
+    min-width: 0;
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+  }
+
+  .box.blue { border-color: #b9cff5; background: #f3f7ff; }
+  .box.cyan { border-color: #a9dce6; background: #effaff; }
+  .box.violet { border-color: #d3c5fb; background: #f6f2ff; }
+  .box.green { border-color: #b8e3c8; background: #f1fbf5; }
+  .box.amber { border-color: #f4cf9b; background: #fff8ed; }
+  .box.red { border-color: #f3b8b2; background: #fff5f4; }
+  .box.gray { border-color: #d0d5dd; background: #f8fafc; }
+
+  .box-title {
+    font-size: 13px;
+    font-weight: 900;
+    line-height: 1.15;
+    letter-spacing: 0;
+  }
+
+  .box-sub {
+    margin-top: 4px;
+    font-size: 10.8px;
+    line-height: 1.28;
+    color: var(--muted);
+  }
+
+  .pill {
+    display: inline-block;
+    margin-top: 6px;
+    width: fit-content;
+    padding: 3px 7px;
+    border-radius: 999px;
+    font-size: 9px;
+    font-weight: 900;
+    letter-spacing: .4px;
+    color: #344054;
+    background: #eef2f7;
+  }
+
+  .user-layer { grid-column: 1 / 5; grid-row: 1; }
+  .comm-layer { grid-column: 1 / 2; grid-row: 2 / 4; }
+  .voice-layer { grid-column: 2 / 4; grid-row: 2; }
+  .orch-layer { grid-column: 2 / 4; grid-row: 3; }
+  .services-layer { grid-column: 1 / 4; grid-row: 4; }
+  .rag-layer { grid-column: 4; grid-row: 2 / 4; }
+  .data-layer { grid-column: 1 / 4; grid-row: 5; }
+  .analytics-layer { grid-column: 4; grid-row: 4 / 6; }
+  .infra-layer { grid-column: 1 / 3; grid-row: 6; }
+  .security-layer { grid-column: 3 / 5; grid-row: 6; }
+
+  .module-grid {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 10px;
+    height: 100%;
+  }
+
+  .module {
+    border: 2px solid;
+    border-radius: 10px;
+    padding: 10px;
+    background: #fff;
+    min-width: 0;
+  }
+
+  .module.citizen { border-color: #b9cff5; background: #f5f8ff; }
+  .module.worker { border-color: #d3c5fb; background: #f8f5ff; }
+  .module.surveillance { border-color: #b8e3c8; background: #f4fbf6; }
+
+  .module-title {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 8px;
+    height: 27px;
+    border-radius: 7px;
+    padding: 0 10px;
+    color: #fff;
+    font-size: 13px;
+    font-weight: 900;
+  }
+
+  .module-title.citizen { background: var(--blue); }
+  .module-title.worker { background: var(--violet); }
+  .module-title.surveillance { background: var(--green); }
+
+  .service-list {
+    margin-top: 9px;
+    display: grid;
+    grid-template-columns: repeat(2, 1fr);
+    gap: 7px;
+  }
+
+  .service {
+    border: 1px solid #d7e1ee;
+    border-radius: 7px;
+    padding: 8px;
+    min-height: 54px;
+    background: #fff;
+  }
+
+  .service strong {
+    display: block;
+    font-size: 11.4px;
+    line-height: 1.14;
+  }
+
+  .service span {
+    display: block;
+    margin-top: 3px;
+    font-size: 9.7px;
+    line-height: 1.23;
+    color: var(--muted);
+  }
+
+  .rag-flow {
+    display: grid;
+    grid-template-columns: 1fr;
+    gap: 8px;
+  }
+
+  .rag-mini {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    font-size: 11px;
+    color: #344054;
+    font-weight: 800;
+  }
+
+  .rag-node {
+    flex: 1;
+    padding: 8px 9px;
+    border: 1px solid #b9dbe7;
+    border-radius: 7px;
+    background: #f1fbff;
+  }
+
+  .side-list {
+    display: grid;
+    gap: 8px;
+    height: 100%;
+  }
+
+  .analytics-map {
+    min-height: 90px;
+    border: 1px solid #b8e3c8;
+    border-radius: 8px;
+    background:
+      radial-gradient(circle at 25% 35%, rgba(180, 35, 24, .32), transparent 11%),
+      radial-gradient(circle at 70% 52%, rgba(245, 158, 11, .35), transparent 13%),
+      radial-gradient(circle at 45% 72%, rgba(20, 128, 74, .22), transparent 16%),
+      linear-gradient(135deg, #f4fbf6, #ffffff);
+    padding: 9px;
+  }
+
+  .connector-layer {
+    pointer-events: none;
+    position: absolute;
+    inset: 0;
+    z-index: 4;
+  }
+
+  .connector {
+    stroke: #1769e0;
+    stroke-width: 2.4;
+    fill: none;
+    marker-end: url(#arrowhead);
+    opacity: .82;
+  }
+
+  .connector.alt { stroke: #14804a; }
+  .connector.warn { stroke: #b45309; }
+  .connector.light { stroke: #8aa4c4; stroke-width: 1.8; opacity: .72; }
+
+  .note {
+    position: absolute;
+    z-index: 5;
+    padding: 5px 8px;
+    border-radius: 999px;
+    background: #fff;
+    border: 1px solid #cdd9e8;
+    font-size: 10px;
+    font-weight: 900;
+    color: #344054;
+    box-shadow: 0 6px 14px rgba(20, 32, 50, .08);
+  }
+
+  .n1 { left: 503px; top: 195px; }
+  .n2 { left: 803px; top: 341px; }
+  .n3 { left: 1402px; top: 616px; }
+
+  .legend {
+    margin-top: 13px;
+    display: grid;
+    grid-template-columns: 1fr auto;
+    gap: 14px;
+    align-items: center;
+    color: #607086;
+    font-size: 12px;
+  }
+
+  .legend strong { color: #344054; }
+
+  .legend-items {
+    display: flex;
+    gap: 10px;
+    flex-wrap: wrap;
+    justify-content: flex-end;
+  }
+
+  .legend-item {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    white-space: nowrap;
+  }
+
+  .dot {
+    width: 10px;
+    height: 10px;
+    border-radius: 50%;
+  }
+
+  @media print {
+    body { background: #fff; }
+    .page { width: 100%; min-height: auto; padding: 10mm; }
+  }
+</style>
+</head>
+<body>
+<main class="page">
+  <section class="titlebar">
+    <div>
+      <h1>AI-Powered Multilingual Rural Healthcare Platform - High Level Architecture</h1>
+      <div class="subtitle">Unified Citizen Health AI, Health Worker AI and Disease Surveillance AI for Tamil Nadu and Karnataka citizens</div>
+    </div>
+    <div class="chiprow">
+      <span class="chip">Sarvam-first AI stack</span>
+      <span class="chip">Tamil, Kannada, Hindi, Hinglish</span>
+      <span class="chip">Voice-first IVR</span>
+      <span class="chip">Realtime WebRTC</span>
+      <span class="chip">Rural low-bandwidth UX</span>
+      <span class="chip">ABDM / HMIS ready</span>
+    </div>
+  </section>
+
+  <section class="flow-ribbon">
+    <span class="flow-step">Citizen speaks Tamil/Kannada</span><span class="arrow">-&gt;</span>
+    <span class="flow-step">LiveKit streaming</span><span class="arrow">-&gt;</span>
+    <span class="flow-step">Sarvam Saarika STT</span><span class="arrow">-&gt;</span>
+    <span class="flow-step">Sarvam LLM intent</span><span class="arrow">-&gt;</span>
+    <span class="flow-step">LangGraph workflow</span><span class="arrow">-&gt;</span>
+    <span class="flow-step">FastAPI services</span><span class="arrow">-&gt;</span>
+    <span class="flow-step">PostgreSQL / Qdrant</span><span class="arrow">-&gt;</span>
+    <span class="flow-step">Bulbul V3 voice response</span>
+  </section>
+
+  <section class="architecture">
+    <svg class="connector-layer" viewBox="0 0 1852 886" preserveAspectRatio="none" aria-hidden="true">
+      <defs>
+        <marker id="arrowhead" markerWidth="10" markerHeight="8" refX="9" refY="4" orient="auto">
+          <path d="M0,0 L10,4 L0,8 Z" fill="#1769e0"></path>
+        </marker>
+      </defs>
+      <path class="connector" d="M922 136 L922 150"></path>
+      <path class="connector" d="M420 300 C520 300 520 218 637 218"></path>
+      <path class="connector" d="M932 300 L932 325"></path>
+      <path class="connector" d="M932 462 L932 480"></path>
+      <path class="connector light" d="M1380 218 C1300 244 1275 315 1196 334"></path>
+      <path class="connector light" d="M1380 500 C1270 500 1250 620 1185 620"></path>
+      <path class="connector warn" d="M1470 620 L1470 775"></path>
+      <path class="connector alt" d="M875 775 L875 827"></path>
+      <path class="connector light" d="M342 620 L342 775"></path>
+      <path class="connector light" d="M735 620 L735 775"></path>
+      <path class="connector alt" d="M1185 620 C1290 635 1352 646 1452 646"></path>
+    </svg>
+
+    <div class="note n1">low latency bidirectional voice</div>
+    <div class="note n2">same-language response generation</div>
+    <div class="note n3">DHO early warning loop</div>
+
+    <section class="layer user-layer">
+      <div class="layer-head head-user"><span>1. User Layer</span><span>Citizens + workers + officers</span></div>
+      <div class="content">
+        <div class="grid4">
+          <div class="box blue">
+            <div class="box-title">Citizen Interfaces</div>
+            <div class="box-sub">Tamil/Kannada IVR, toll-free phone calls, Next.js web app, mobile web voice widget</div>
+            <span class="pill">uneducated and elderly friendly</span>
+          </div>
+          <div class="box violet">
+            <div class="box-title">Health Worker Portal</div>
+            <div class="box-sub">ASHA dashboard, PHC nurse workspace, voice-based patient updates, referral UI</div>
+            <span class="pill">offline sync capable</span>
+          </div>
+          <div class="box green">
+            <div class="box-title">Government Officer Dashboard</div>
+            <div class="box-sub">District analytics, outbreak monitoring, heatmaps, PHC performance KPIs</div>
+            <span class="pill">DHO response planning</span>
+          </div>
+          <div class="box cyan">
+            <div class="box-title">Portal AI Widget</div>
+            <div class="box-sub">Browser audio, chat fallback, language auto-detect, low-bandwidth interface</div>
+            <span class="pill">Tamil/Kannada/Hindi/Hinglish</span>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <section class="layer comm-layer">
+      <div class="layer-head head-comm"><span>2. Communication Layer</span><span>Realtime + IVR</span></div>
+      <div class="content">
+        <div class="stack">
+          <div class="box cyan">
+            <div class="box-title">Twilio / Exotel Telephony</div>
+            <div class="box-sub">PSTN phone call, SIP trunk, IVR menu, SMS reminders</div>
+          </div>
+          <div class="box cyan">
+            <div class="box-title">SIP Bridge + IVR Integration</div>
+            <div class="box-sub">Phone Call -&gt; SIP/IVR -&gt; LiveKit media bridge</div>
+          </div>
+          <div class="box cyan">
+            <div class="box-title">LiveKit Realtime Server</div>
+            <div class="box-sub">WebRTC audio streaming, VAD, room sessions, bidirectional voice</div>
+            <span class="pill">low latency</span>
+          </div>
+          <div class="box blue">
+            <div class="box-title">Nginx API Gateway</div>
+            <div class="box-sub">TLS termination, routing, rate limits, auth forwarding</div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <section class="layer voice-layer">
+      <div class="layer-head head-voice"><span>3. Sarvam Voice AI Layer</span><span>Saarika + Sarvam LLM + Bulbul V3</span></div>
+      <div class="content">
+        <div class="row">
+          <div class="box violet">
+            <div class="box-title">Sarvam Saarika Recognition</div>
+            <div class="box-sub">Automatic language detection, multilingual ASR, speech-to-text for Tamil, Kannada, Hindi and Hinglish</div>
+            <span class="pill">streaming STT</span>
+          </div>
+          <div class="box violet">
+            <div class="box-title">Sarvam Multilingual LLM</div>
+            <div class="box-sub">Intent understanding, healthcare reasoning, contextual dialogue, safety-grounded responses</div>
+            <span class="pill">same-language reasoning</span>
+          </div>
+          <div class="box violet">
+            <div class="box-title">Sarvam Bulbul V3</div>
+            <div class="box-sub">Natural multilingual speech synthesis for realtime voice responses over IVR and browser audio</div>
+            <span class="pill">realtime TTS</span>
+          </div>
+          <div class="box violet">
+            <div class="box-title">Language Adaptation</div>
+            <div class="box-sub">Detect language, preserve dialect preference, translate only when required, reply in user's language</div>
+            <span class="pill">Tamil/Kannada first</span>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <section class="layer orch-layer">
+      <div class="layer-head head-orch"><span>4. AI Orchestration Layer</span><span>LangGraph + MCP tools + memory</span></div>
+      <div class="content">
+        <div class="grid4">
+          <div class="box green">
+            <div class="box-title">LangGraph Engine</div>
+            <div class="box-sub">Stateful workflows, branching, retries, streaming response assembly</div>
+          </div>
+          <div class="box green">
+            <div class="box-title">Intent Router</div>
+            <div class="box-sub">Routes to Citizen Health AI, Health Worker AI or Disease Surveillance AI</div>
+          </div>
+          <div class="box green">
+            <div class="box-title">MCP Tool Integration</div>
+            <div class="box-sub">Tool calling for eligibility, booking, RAG, EMR, referral and alerts</div>
+          </div>
+          <div class="box green">
+            <div class="box-title">Conversation Memory</div>
+            <div class="box-sub">Redis session state, user context, ABHA-linked identity when consented</div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <section class="layer services-layer">
+      <div class="layer-head head-services"><span>5. Backend Microservices Layer - Python FastAPI</span><span>Three AI modules in one flow</span></div>
+      <div class="content">
+        <div class="module-grid">
+          <article class="module citizen">
+            <div class="module-title citizen"><span>Citizen Health AI</span><span>Public services</span></div>
+            <div class="service-list">
+              <div class="service"><strong>Hospital Search Service</strong><span>PHC/CHC locator, specialty lookup, navigation guidance</span></div>
+              <div class="service"><strong>Appointment Booking</strong><span>Slots, IVR booking guidance, OTP confirmation, reminders</span></div>
+              <div class="service"><strong>Eligibility Engine</strong><span>Ayushman Bharat, CMCHIS, ABHA/KYC lookup with consent</span></div>
+              <div class="service"><strong>Maternal Reminder Service</strong><span>ANC/PNC checkups, vaccination reminders, NHM follow-up</span></div>
+              <div class="service"><strong>NHM Query Service</strong><span>Programme FAQs grounded by RAG documents</span></div>
+              <div class="service"><strong>Emergency Assistance</strong><span>108 guidance, nearest ER, triage escalation</span></div>
+            </div>
+          </article>
+
+          <article class="module worker">
+            <div class="module-title worker"><span>Health Worker AI</span><span>ASHA + PHC</span></div>
+            <div class="service-list">
+              <div class="service"><strong>Voice EMR Service</strong><span>Tamil/Kannada speech to structured FHIR-ready patient records</span></div>
+              <div class="service"><strong>Protocol Assistant</strong><span>GenAI protocol lookup, care guidance, programme rules</span></div>
+              <div class="service"><strong>Referral Engine</strong><span>When/where to refer, risk scoring, facility routing</span></div>
+              <div class="service"><strong>Workflow Automation</strong><span>Task queues, visit checklists, follow-up scheduling</span></div>
+              <div class="service"><strong>FHIR Converter</strong><span>HL7/FHIR R4 adapter for HMIS-to-Sarvam middleware</span></div>
+              <div class="service"><strong>PHC Operations</strong><span>Patient queues, high-risk flags, supply and follow-up alerts</span></div>
+            </div>
+          </article>
+
+          <article class="module surveillance">
+            <div class="module-title surveillance"><span>Disease Surveillance AI</span><span>DHO early warning</span></div>
+            <div class="service-list">
+              <div class="service"><strong>Disease Analytics Engine</strong><span>Data fusion, ICD-10 mapping, district and block trends</span></div>
+              <div class="service"><strong>Outbreak Prediction</strong><span>Anomaly detection, time-series forecasting, 2-3 week signals</span></div>
+              <div class="service"><strong>Alert Engine</strong><span>DHO SMS/email/push alerts, severity scoring, escalation</span></div>
+              <div class="service"><strong>District Trend Monitor</strong><span>Heatmaps, risk zones, case density, intervention tracking</span></div>
+              <div class="service"><strong>IHIP/HMIS Ingest</strong><span>Surveillance feeds, lab reports, notifiable disease data</span></div>
+              <div class="service"><strong>Response Planner</strong><span>Resource allocation, PHC alerts, auto-generated summaries</span></div>
+            </div>
+          </article>
+        </div>
+      </div>
+    </section>
+
+    <section class="layer rag-layer">
+      <div class="layer-head head-rag"><span>6. AI + RAG Layer</span><span>Qdrant / pgvector</span></div>
+      <div class="content">
+        <div class="rag-flow">
+          <div class="rag-mini"><div class="rag-node">Question</div><span class="arrow">-&gt;</span></div>
+          <div class="rag-mini"><div class="rag-node">Sarvam Embedding</div><span class="arrow">-&gt;</span></div>
+          <div class="rag-mini"><div class="rag-node">Vector Search</div><span class="arrow">-&gt;</span></div>
+          <div class="rag-mini"><div class="rag-node">Relevant Context</div><span class="arrow">-&gt;</span></div>
+          <div class="rag-mini"><div class="rag-node">Sarvam LLM Response</div></div>
+          <div class="box cyan">
+            <div class="box-title">Healthcare Knowledge Base</div>
+            <div class="box-sub">Ayushman Bharat, CMCHIS, NHM docs, treatment protocols, hospital datasets, FAQs</div>
+            <span class="pill">grounded answers</span>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <section class="layer data-layer">
+      <div class="layer-head head-data"><span>7. Database + Integration Layer</span><span>PostgreSQL, Redis, queues, HMIS middleware</span></div>
+      <div class="content">
+        <div class="grid4">
+          <div class="box gray">
+            <div class="box-title">PostgreSQL Cluster</div>
+            <div class="box-sub">Citizens, appointments, reminders, hospitals, patients, referrals, disease events, analytics</div>
+          </div>
+          <div class="box gray">
+            <div class="box-title">Redis + Async Queues</div>
+            <div class="box-sub">Session cache, conversation state, Celery workers, retries, reminder and alert jobs</div>
+          </div>
+          <div class="box gray">
+            <div class="box-title">Qdrant / pgvector</div>
+            <div class="box-sub">Scheme vectors, protocol vectors, hospital semantic search, FAQ retrieval</div>
+          </div>
+          <div class="box gray">
+            <div class="box-title">National Data Connectors</div>
+            <div class="box-sub">ABDM/UHI, CMCHIS, Ayushman Bharat, IHIP/IDSP, HMIS-to-Sarvam middleware placeholder</div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <section class="layer analytics-layer">
+      <div class="layer-head head-analytics"><span>8. Analytics Layer</span><span>DHO dashboards</span></div>
+      <div class="content">
+        <div class="side-list">
+          <div class="analytics-map">
+            <div class="box-title">Disease Heatmaps</div>
+            <div class="box-sub">District, taluk and block-level hotspot tracking with early risk overlays</div>
+          </div>
+          <div class="box green">
+            <div class="box-title">Predictive Outbreak Detection</div>
+            <div class="box-sub">2-3 week early warning using trends, labs, symptoms, IHIP/HMIS signals</div>
+          </div>
+          <div class="box green">
+            <div class="box-title">Maternal Health Monitoring</div>
+            <div class="box-sub">ANC/PNC coverage, high-risk pregnancy flags, follow-up completion</div>
+          </div>
+          <div class="box amber">
+            <div class="box-title">AI-Generated Alerts</div>
+            <div class="box-sub">Severity, affected area, recommended actions and response workflow</div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <section class="layer infra-layer">
+      <div class="layer-head head-infra"><span>9. Infrastructure Layer</span><span>Cloud-native scale</span></div>
+      <div class="content">
+        <div class="grid3">
+          <div class="box gray"><div class="box-title">Docker Containers</div><div class="box-sub">FastAPI, workers, gateways, AI adapters</div></div>
+          <div class="box gray"><div class="box-title">OpenShift / Kubernetes</div><div class="box-sub">Autoscaling, rolling deploys, resilient pods</div></div>
+          <div class="box gray"><div class="box-title">CI/CD + Load Balancing</div><div class="box-sub">GitHub Actions, Nginx ingress, horizontal scaling</div></div>
+        </div>
+      </div>
+    </section>
+
+    <section class="layer security-layer">
+      <div class="layer-head head-security"><span>10. Security, Monitoring and Reliability</span><span>Healthcare grade controls</span></div>
+      <div class="content">
+        <div class="grid4">
+          <div class="box red"><div class="box-title">JWT / OAuth2 / RBAC</div><div class="box-sub">Citizen, ASHA worker, doctor, DHO roles</div></div>
+          <div class="box red"><div class="box-title">Encrypted Records</div><div class="box-sub">TLS, encryption at rest, consent, audit logging</div></div>
+          <div class="box cyan"><div class="box-title">Prometheus + Grafana</div><div class="box-sub">Metrics, dashboards, SLOs, realtime health</div></div>
+          <div class="box cyan"><div class="box-title">Logging + Reliability</div><div class="box-sub">Central logs, retry queues, fault tolerance, alerting</div></div>
+        </div>
+      </div>
+    </section>
+  </section>
+
+  <section class="legend">
+    <div><strong>Design focus:</strong> voice-first IVR for low-literacy rural users, automatic language detection, Sarvam-first conversational AI, HMIS integration placeholder, scalable FastAPI microservices and DHO-grade surveillance analytics.</div>
+    <div class="legend-items">
+      <span class="legend-item"><span class="dot" style="background:#1769e0"></span>User/voice flow</span>
+      <span class="legend-item"><span class="dot" style="background:#14804a"></span>Analytics/alert loop</span>
+      <span class="legend-item"><span class="dot" style="background:#b45309"></span>DHO escalation</span>
+      <span class="legend-item"><span class="dot" style="background:#8aa4c4"></span>Data/RAG integration</span>
+    </div>
+  </section>
+</main>
+</body>
+</html>

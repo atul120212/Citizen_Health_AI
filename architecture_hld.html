@@ -1,0 +1,1089 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Citizen Health AI Platform — Enterprise HLD</title>
+<style>
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body {
+    background: #0a0e1a;
+    font-family: 'Segoe UI', system-ui, sans-serif;
+    color: #e2e8f0;
+    min-height: 100vh;
+    padding: 20px;
+  }
+
+  /* ── HEADER ── */
+  .header {
+    text-align: center;
+    padding: 28px 20px 20px;
+    background: linear-gradient(135deg, #0f172a 0%, #1e3a5f 50%, #0f172a 100%);
+    border: 1px solid #1e40af44;
+    border-radius: 16px;
+    margin-bottom: 24px;
+    position: relative;
+    overflow: hidden;
+  }
+  .header::before {
+    content: '';
+    position: absolute; inset: 0;
+    background: radial-gradient(ellipse at 50% 0%, #1d4ed820 0%, transparent 70%);
+  }
+  .header h1 {
+    font-size: 26px; font-weight: 800; letter-spacing: 0.5px;
+    background: linear-gradient(90deg, #60a5fa, #a78bfa, #34d399);
+    -webkit-background-clip: text; -webkit-text-fill-color: transparent;
+    position: relative;
+  }
+  .header p { color: #94a3b8; font-size: 13px; margin-top: 6px; position: relative; }
+  .badges { display: flex; gap: 8px; justify-content: center; margin-top: 10px; flex-wrap: wrap; }
+  .badge {
+    padding: 3px 10px; border-radius: 20px; font-size: 10px; font-weight: 700;
+    letter-spacing: 0.8px; text-transform: uppercase;
+  }
+  .badge-blue   { background: #1d4ed840; border: 1px solid #3b82f6; color: #93c5fd; }
+  .badge-green  { background: #06402040; border: 1px solid #22c55e; color: #86efac; }
+  .badge-purple { background: #4c1d9540; border: 1px solid #8b5cf6; color: #c4b5fd; }
+  .badge-orange { background: #7c2d1240; border: 1px solid #f97316; color: #fdba74; }
+
+  /* ── FLOW BANNER ── */
+  .flow-banner {
+    background: linear-gradient(90deg, #0f172a, #1e3a5f22, #0f172a);
+    border: 1px solid #1e40af55;
+    border-radius: 12px;
+    padding: 12px 20px;
+    margin-bottom: 24px;
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    flex-wrap: wrap;
+    font-size: 11px;
+    color: #94a3b8;
+    justify-content: center;
+  }
+  .flow-banner .step {
+    background: #1e3a5f;
+    border: 1px solid #3b82f640;
+    border-radius: 6px;
+    padding: 4px 10px;
+    color: #93c5fd;
+    font-weight: 600;
+    white-space: nowrap;
+  }
+  .flow-arrow { color: #4b7bec; font-weight: bold; font-size: 14px; }
+
+  /* ── LAYER WRAPPER ── */
+  .diagram { display: flex; flex-direction: column; gap: 16px; }
+
+  .layer {
+    border-radius: 14px;
+    padding: 16px;
+    position: relative;
+    overflow: hidden;
+  }
+  .layer::before {
+    content: attr(data-label);
+    position: absolute; top: 10px; right: 14px;
+    font-size: 9px; font-weight: 700; letter-spacing: 1.5px;
+    text-transform: uppercase; opacity: 0.45;
+  }
+  .layer-title {
+    font-size: 11px; font-weight: 800; letter-spacing: 1.8px;
+    text-transform: uppercase; margin-bottom: 12px;
+    display: flex; align-items: center; gap: 8px;
+  }
+  .layer-title .icon { font-size: 16px; }
+  .layer-title .num {
+    width: 20px; height: 20px; border-radius: 50%;
+    display: flex; align-items: center; justify-content: center;
+    font-size: 10px; font-weight: 900; flex-shrink: 0;
+  }
+
+  /* layer colours */
+  .l-user       { background: #0f172a; border: 1.5px solid #1e40af55; }
+  .l-comm       { background: #0a1628; border: 1.5px solid #0284c755; }
+  .l-voice      { background: #120a28; border: 1.5px solid #7c3aed55; }
+  .l-orch       { background: #0a1a10; border: 1.5px solid #15803d55; }
+  .l-services   { background: #1a100a; border: 1.5px solid #c2410c55; }
+  .l-rag        { background: #0a1520; border: 1.5px solid #0369a155; }
+  .l-db         { background: #110f0a; border: 1.5px solid #a16207 55; }
+  .l-analytics  { background: #0f0a1a; border: 1.5px solid #6d28d955; }
+  .l-infra      { background: #0f1a0a; border: 1.5px solid #166534 55; }
+  .l-security   { background: #1a0a0a; border: 1.5px solid #991b1b55; }
+  .l-monitor    { background: #0a1520; border: 1.5px solid #0e7490 55; }
+
+  /* ── CARDS GRID ── */
+  .cards { display: flex; flex-wrap: wrap; gap: 10px; }
+  .cards.cols-3 { display: grid; grid-template-columns: repeat(3, 1fr); }
+  .cards.cols-4 { display: grid; grid-template-columns: repeat(4, 1fr); }
+  .cards.cols-5 { display: grid; grid-template-columns: repeat(5, 1fr); }
+  .cards.cols-2 { display: grid; grid-template-columns: repeat(2, 1fr); }
+
+  .card {
+    border-radius: 10px;
+    padding: 12px 14px;
+    border: 1px solid #ffffff12;
+    position: relative;
+    transition: transform 0.15s;
+  }
+  .card:hover { transform: translateY(-1px); }
+
+  /* card colour variants */
+  .c-blue   { background: #172554; border-color: #3b82f655; }
+  .c-indigo { background: #1e1b4b; border-color: #6366f155; }
+  .c-purple { background: #2e1065; border-color: #a855f755; }
+  .c-green  { background: #052e16; border-color: #22c55e55; }
+  .c-teal   { background: #042f2e; border-color: #14b8a655; }
+  .c-cyan   { background: #0a2b36; border-color: #06b6d455; }
+  .c-orange { background: #431407; border-color: #f9731655; }
+  .c-amber  { background: #451a03; border-color: #f59e0b55; }
+  .c-red    { background: #450a0a; border-color: #ef444455; }
+  .c-pink   { background: #4a044e; border-color: #ec489955; }
+  .c-sky    { background: #082f49; border-color: #0ea5e955; }
+  .c-lime   { background: #1a2e05; border-color: #84cc1655; }
+  .c-gray   { background: #1e293b; border-color: #64748b55; }
+  .c-dark   { background: #0f172a; border-color: #334155; }
+
+  .card-icon  { font-size: 20px; margin-bottom: 6px; }
+  .card-title { font-size: 11px; font-weight: 700; color: #e2e8f0; margin-bottom: 4px; }
+  .card-sub   { font-size: 9.5px; color: #94a3b8; line-height: 1.5; }
+  .card-tag   {
+    display: inline-block; padding: 1px 7px; border-radius: 10px;
+    font-size: 8.5px; font-weight: 700; letter-spacing: 0.5px;
+    margin-top: 5px; text-transform: uppercase;
+  }
+  .tag-blue   { background:#1d4ed840; border:1px solid #3b82f6; color:#93c5fd; }
+  .tag-green  { background:#06402040; border:1px solid #22c55e; color:#86efac; }
+  .tag-purple { background:#4c1d9540; border:1px solid #a855f7; color:#d8b4fe; }
+  .tag-orange { background:#7c2d1240; border:1px solid #f97316; color:#fdba74; }
+  .tag-teal   { background:#042f2e40; border:1px solid #14b8a6; color:#5eead4; }
+  .tag-red    { background:#450a0a40; border:1px solid #ef4444; color:#fca5a5; }
+  .tag-amber  { background:#451a0340; border:1px solid #f59e0b; color:#fde68a; }
+  .tag-cyan   { background:#0a2b3640; border:1px solid #06b6d4; color:#67e8f9; }
+
+  /* ── DIVIDER ARROW ── */
+  .layer-arrow {
+    text-align: center;
+    padding: 4px 0;
+    font-size: 22px;
+    color: #334155;
+    line-height: 1;
+  }
+
+  /* ── MODULE GROUP ── */
+  .module-group {
+    border: 1px dashed #ffffff18;
+    border-radius: 10px;
+    padding: 12px;
+    margin-bottom: 10px;
+  }
+  .module-group-title {
+    font-size: 9px; font-weight: 800; letter-spacing: 1.5px;
+    text-transform: uppercase; margin-bottom: 10px;
+    color: #94a3b8;
+  }
+
+  /* ── HORIZONTAL FLOW inside a layer ── */
+  .hflow {
+    display: flex; align-items: center; gap: 8px; flex-wrap: wrap;
+  }
+  .hflow .arr { color: #3b82f6; font-size: 18px; font-weight: 700; }
+
+  /* ── 3-COLUMN MODULE GROUPS ── */
+  .modules-row {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 12px;
+  }
+  .module-box {
+    border-radius: 10px;
+    padding: 12px;
+    border: 1px solid #ffffff18;
+  }
+  .module-box.citizen   { background: #172554aa; border-color: #3b82f655; }
+  .module-box.worker    { background: #1e1b4baa; border-color: #8b5cf655; }
+  .module-box.disease   { background: #052e16aa; border-color: #22c55e55; }
+  .module-box-title {
+    font-size: 10px; font-weight: 800; letter-spacing: 1px;
+    text-transform: uppercase; margin-bottom: 10px;
+  }
+  .module-box.citizen .module-box-title { color: #93c5fd; }
+  .module-box.worker  .module-box-title { color: #c4b5fd; }
+  .module-box.disease .module-box-title { color: #86efac; }
+
+  /* ── SMALL PILL ── */
+  .pill {
+    display: inline-flex; align-items: center; gap: 5px;
+    padding: 4px 10px; border-radius: 20px;
+    font-size: 10px; font-weight: 600;
+    border: 1px solid #ffffff18;
+    margin: 3px 3px 3px 0;
+  }
+  .pill-blue   { background:#1d4ed8 22; border-color:#3b82f6; color:#93c5fd; }
+  .pill-green  { background:#06402022; border-color:#22c55e; color:#86efac; }
+  .pill-purple { background:#4c1d9522; border-color:#a855f7; color:#d8b4fe; }
+  .pill-amber  { background:#451a0322; border-color:#f59e0b; color:#fde68a; }
+  .pill-teal   { background:#042f2e22; border-color:#14b8a6; color:#5eead4; }
+  .pill-red    { background:#450a0a22; border-color:#ef4444; color:#fca5a5; }
+
+  /* ── FOOTER ── */
+  .footer {
+    text-align: center;
+    margin-top: 20px;
+    padding: 14px;
+    color: #475569;
+    font-size: 10px;
+    border-top: 1px solid #1e293b;
+  }
+
+  .section-label {
+    font-size: 9px; font-weight: 700; letter-spacing: 1.8px;
+    text-transform: uppercase; padding: 2px 8px; border-radius: 4px;
+    display: inline-block; margin-bottom: 8px;
+  }
+
+  /* responsive */
+  @media (max-width: 900px) {
+    .cards.cols-3, .cards.cols-4, .cards.cols-5 { grid-template-columns: repeat(2, 1fr); }
+    .modules-row { grid-template-columns: 1fr; }
+  }
+  @media (max-width: 600px) {
+    .cards.cols-2, .cards.cols-3, .cards.cols-4, .cards.cols-5 { grid-template-columns: 1fr; }
+  }
+</style>
+</head>
+<body>
+
+<!-- ═══════════════════════════════════════════════════════════ HEADER -->
+<div class="header">
+  <h1>🏥 Citizen Health AI Platform — Enterprise High-Level Architecture</h1>
+  <p>AI-Powered Multilingual Rural Healthcare Ecosystem · Tamil Nadu &amp; Karnataka · 7–8 Crore Citizens</p>
+  <div class="badges">
+    <span class="badge badge-blue">Voice-First</span>
+    <span class="badge badge-green">Sarvam AI Stack</span>
+    <span class="badge badge-purple">LangGraph Orchestration</span>
+    <span class="badge badge-orange">Cloud-Native · K8s</span>
+    <span class="badge badge-blue">Tamil · Kannada · Hindi · Hinglish</span>
+    <span class="badge badge-green">ABDM · CMCHIS · NHM Compliant</span>
+  </div>
+</div>
+
+<!-- ═══════════════════════════════════════════════════════ E2E FLOW BANNER -->
+<div class="flow-banner">
+  <span class="step">👤 Citizen speaks Tamil/Kannada</span>
+  <span class="flow-arrow">→</span>
+  <span class="step">📞 IVR / LiveKit Stream</span>
+  <span class="flow-arrow">→</span>
+  <span class="step">🎙️ Sarvam Saarika STT</span>
+  <span class="flow-arrow">→</span>
+  <span class="step">🧠 Sarvam LLM Intent</span>
+  <span class="flow-arrow">→</span>
+  <span class="step">⚙️ LangGraph Orchestrate</span>
+  <span class="flow-arrow">→</span>
+  <span class="step">🏗️ FastAPI Microservices</span>
+  <span class="flow-arrow">→</span>
+  <span class="step">🗄️ PostgreSQL / Qdrant</span>
+  <span class="flow-arrow">→</span>
+  <span class="step">🔊 Sarvam Bulbul V3 TTS</span>
+  <span class="flow-arrow">→</span>
+  <span class="step">🗣️ Citizen hears AI response</span>
+</div>
+
+<div class="diagram">
+
+<!-- ══════════════════════════════════════════════════ LAYER 1: USER -->
+<div class="layer l-user">
+  <div class="layer-title">
+    <span class="num" style="background:#1d4ed8;color:#fff">1</span>
+    <span class="icon">👥</span>
+    <span style="color:#60a5fa">USER LAYER</span>
+    <span style="color:#475569;font-weight:400;font-size:10px;margin-left:4px">— Citizens · ASHA Workers · PHC Nurses · District Officers</span>
+  </div>
+
+  <div class="modules-row">
+
+    <div class="module-box citizen">
+      <div class="module-box-title">🏙️ Citizen Interfaces</div>
+      <div class="cards cols-2">
+        <div class="card c-blue">
+          <div class="card-icon">📞</div>
+          <div class="card-title">IVR Phone Call</div>
+          <div class="card-sub">Twilio / Exotel<br>PSTN/SIP gateway<br>No smartphone needed</div>
+          <span class="card-tag tag-green">Rural-First</span>
+        </div>
+        <div class="card c-sky">
+          <div class="card-icon">🌐</div>
+          <div class="card-title">Next.js Web App</div>
+          <div class="card-sub">Portal AI Widget<br>Voice-enabled browser<br>Low-bandwidth optimised</div>
+          <span class="card-tag tag-blue">React/Next.js</span>
+        </div>
+        <div class="card c-indigo">
+          <div class="card-icon">📱</div>
+          <div class="card-title">Mobile Web App</div>
+          <div class="card-sub">Android PWA<br>ASHA mobile app<br>Offline sync</div>
+          <span class="card-tag tag-purple">Offline Capable</span>
+        </div>
+        <div class="card c-teal">
+          <div class="card-icon">🔔</div>
+          <div class="card-title">SMS / WhatsApp</div>
+          <div class="card-sub">Reminder delivery<br>Maternal alerts<br>NHM notifications</div>
+          <span class="card-tag tag-teal">Push Alerts</span>
+        </div>
+      </div>
+    </div>
+
+    <div class="module-box worker">
+      <div class="module-box-title">👩‍⚕️ Health Worker Portal</div>
+      <div class="cards cols-2">
+        <div class="card c-purple">
+          <div class="card-icon">🩺</div>
+          <div class="card-title">ASHA Dashboard</div>
+          <div class="card-sub">Patient list view<br>Visit tracking<br>Workflow tasks</div>
+          <span class="card-tag tag-purple">ASHA Workers</span>
+        </div>
+        <div class="card c-indigo">
+          <div class="card-icon">🎙️</div>
+          <div class="card-title">Voice EMR Entry</div>
+          <div class="card-sub">Voice patient updates<br>Tamil/Kannada input<br>Structured capture</div>
+          <span class="card-tag tag-blue">Voice-First</span>
+        </div>
+        <div class="card c-pink">
+          <div class="card-icon">🔁</div>
+          <div class="card-title">Referral UI</div>
+          <div class="card-sub">Smart referral form<br>Hospital routing<br>Escalation guide</div>
+          <span class="card-tag tag-purple">PHC Nurses</span>
+        </div>
+        <div class="card c-indigo">
+          <div class="card-icon">📋</div>
+          <div class="card-title">Protocol Lookup</div>
+          <div class="card-sub">NHM guidelines<br>Treatment protocols<br>Drug dosage</div>
+          <span class="card-tag tag-teal">GenAI Assist</span>
+        </div>
+      </div>
+    </div>
+
+    <div class="module-box disease">
+      <div class="module-box-title">🏛️ Government Officer Dashboard</div>
+      <div class="cards cols-2">
+        <div class="card c-green">
+          <div class="card-icon">🗺️</div>
+          <div class="card-title">Disease Heatmap</div>
+          <div class="card-sub">District-wise view<br>Outbreak hotspots<br>Real-time map</div>
+          <span class="card-tag tag-green">Live Analytics</span>
+        </div>
+        <div class="card c-teal">
+          <div class="card-icon">📊</div>
+          <div class="card-title">Analytics Console</div>
+          <div class="card-sub">Trend charts<br>Programme KPIs<br>NHM reporting</div>
+          <span class="card-tag tag-teal">District DHO</span>
+        </div>
+        <div class="card c-green">
+          <div class="card-icon">🚨</div>
+          <div class="card-title">Outbreak Monitor</div>
+          <div class="card-sub">Early warning alerts<br>2–3 week forecast<br>IHIP integration</div>
+          <span class="card-tag tag-orange">AI-Predicted</span>
+        </div>
+        <div class="card c-lime">
+          <div class="card-icon">📥</div>
+          <div class="card-title">Data Reports</div>
+          <div class="card-sub">Scheduled exports<br>CMCHIS dashboards<br>Maternal tracking</div>
+          <span class="card-tag tag-green">CMCHIS</span>
+        </div>
+      </div>
+    </div>
+
+  </div>
+</div>
+
+<div class="layer-arrow">⬇</div>
+
+<!-- ══════════════════════════════════════════════════ LAYER 2: COMMUNICATION -->
+<div class="layer l-comm">
+  <div class="layer-title">
+    <span class="num" style="background:#0284c7;color:#fff">2</span>
+    <span class="icon">📡</span>
+    <span style="color:#38bdf8">COMMUNICATION LAYER</span>
+    <span style="color:#475569;font-weight:400;font-size:10px;margin-left:4px">— Realtime Bidirectional Voice Streaming</span>
+  </div>
+  <div class="cards cols-4">
+    <div class="card c-sky">
+      <div class="card-icon">📞</div>
+      <div class="card-title">Twilio / Exotel IVR</div>
+      <div class="card-sub">PSTN phone gateway<br>SIP trunk bridge<br>Rural IVR menus<br>Toll-free 1800 line</div>
+      <span class="card-tag tag-blue">Telephony</span>
+    </div>
+    <div class="card c-cyan">
+      <div class="card-icon">🔴</div>
+      <div class="card-title">LiveKit Realtime Server</div>
+      <div class="card-sub">WebRTC audio streaming<br>Sub-100ms latency<br>Server-side VAD<br>Bidirectional audio</div>
+      <span class="card-tag tag-cyan">Low Latency</span>
+    </div>
+    <div class="card c-sky">
+      <div class="card-icon">🌉</div>
+      <div class="card-title">SIP / WebRTC Bridge</div>
+      <div class="card-sub">SIP-to-WebRTC adapter<br>Audio codec: Opus<br>TURN/STUN servers<br>NAT traversal</div>
+      <span class="card-tag tag-teal">WebRTC</span>
+    </div>
+    <div class="card c-indigo">
+      <div class="card-icon">🔗</div>
+      <div class="card-title">API Gateway (Nginx)</div>
+      <div class="card-sub">Rate limiting<br>Load balancing<br>SSL termination<br>Request routing</div>
+      <span class="card-tag tag-purple">Secure Tunnel</span>
+    </div>
+  </div>
+</div>
+
+<div class="layer-arrow">⬇</div>
+
+<!-- ══════════════════════════════════════════════════ LAYER 3: VOICE AI -->
+<div class="layer l-voice">
+  <div class="layer-title">
+    <span class="num" style="background:#7c3aed;color:#fff">3</span>
+    <span class="icon">🎙️</span>
+    <span style="color:#a78bfa">VOICE AI LAYER — SARVAM AI STACK</span>
+    <span style="color:#475569;font-weight:400;font-size:10px;margin-left:4px">— Tamil · Kannada · Hindi · Hinglish</span>
+  </div>
+
+  <div class="hflow" style="margin-bottom:12px">
+    <div class="card c-purple" style="flex:1;min-width:200px">
+      <div class="card-icon">🇮🇳</div>
+      <div class="card-title">Sarvam Saarika — STT</div>
+      <div class="card-sub">
+        Auto language detection · Multilingual ASR<br>
+        Tamil / Kannada / Hindi / Hinglish<br>
+        Streaming speech-to-text · &lt;200ms RTF<br>
+        Noise-robust (rural env.)<br>
+        PSTN audio quality support
+      </div>
+      <span class="card-tag tag-purple">Speech-to-Text</span>
+    </div>
+    <div class="arr">→</div>
+    <div class="card c-indigo" style="flex:1;min-width:200px">
+      <div class="card-icon">🧠</div>
+      <div class="card-title">Sarvam Multilingual LLM</div>
+      <div class="card-sub">
+        Intent recognition · Contextual reasoning<br>
+        Healthcare domain knowledge<br>
+        Multilingual conversation handling<br>
+        Same-language reply generation<br>
+        NHM / CMCHIS scheme knowledge
+      </div>
+      <span class="card-tag tag-blue">Core LLM</span>
+    </div>
+    <div class="arr">→</div>
+    <div class="card c-pink" style="flex:1;min-width:200px">
+      <div class="card-icon">🔊</div>
+      <div class="card-title">Sarvam Bulbul V3 — TTS</div>
+      <div class="card-sub">
+        Natural voice synthesis<br>
+        Tamil / Kannada / Hindi output<br>
+        Streaming TTS · Realtime playback<br>
+        Female / Male voice options<br>
+        Rural-friendly clear diction
+      </div>
+      <span class="card-tag tag-purple">Text-to-Speech</span>
+    </div>
+    <div class="arr">→</div>
+    <div class="card c-cyan" style="flex:1;min-width:160px">
+      <div class="card-icon">🔄</div>
+      <div class="card-title">Language Auto-Adapt</div>
+      <div class="card-sub">
+        Detect input language<br>
+        Switch context seamlessly<br>
+        Respond in same language<br>
+        Code-switch support
+      </div>
+      <span class="card-tag tag-cyan">Auto-Detect</span>
+    </div>
+  </div>
+
+  <div style="background:#2e1065; border:1px dashed #7c3aed55; border-radius:8px; padding:10px; margin-top:4px;">
+    <div class="section-label" style="background:#4c1d9555;color:#c4b5fd">Sarvam API Integration</div>
+    <div style="display:flex;gap:8px;flex-wrap:wrap">
+      <span class="pill pill-purple">🔗 Sarvam Speech API</span>
+      <span class="pill pill-purple">📝 Sarvam Translate API</span>
+      <span class="pill pill-purple">🧾 Sarvam Text API</span>
+      <span class="pill pill-blue">⚡ Streaming gRPC</span>
+      <span class="pill pill-teal">🌐 REST Endpoints</span>
+      <span class="pill pill-amber">🔑 API Key Auth</span>
+    </div>
+  </div>
+</div>
+
+<div class="layer-arrow">⬇</div>
+
+<!-- ══════════════════════════════════════════════════ LAYER 4: ORCHESTRATION -->
+<div class="layer l-orch">
+  <div class="layer-title">
+    <span class="num" style="background:#15803d;color:#fff">4</span>
+    <span class="icon">⚙️</span>
+    <span style="color:#4ade80">AI ORCHESTRATION LAYER</span>
+    <span style="color:#475569;font-weight:400;font-size:10px;margin-left:4px">— LangGraph · MCP · Tool Calling · Intent Router</span>
+  </div>
+
+  <div class="cards cols-4">
+    <div class="card c-green">
+      <div class="card-icon">🕸️</div>
+      <div class="card-title">LangGraph Engine</div>
+      <div class="card-sub">
+        Stateful workflow graphs<br>
+        Multi-agent coordination<br>
+        Conditional branching<br>
+        Async parallel execution<br>
+        Error recovery loops
+      </div>
+      <span class="card-tag tag-green">Orchestrator</span>
+    </div>
+    <div class="card c-teal">
+      <div class="card-icon">🔀</div>
+      <div class="card-title">Intent Router</div>
+      <div class="card-sub">
+        Route → Citizen AI<br>
+        Route → Health Worker AI<br>
+        Route → Disease Surveillance<br>
+        Fallback + escalation<br>
+        Confidence scoring
+      </div>
+      <span class="card-tag tag-teal">Smart Router</span>
+    </div>
+    <div class="card c-green">
+      <div class="card-icon">🛠️</div>
+      <div class="card-title">MCP Tool Calling</div>
+      <div class="card-sub">
+        Hospital search tool<br>
+        Eligibility check tool<br>
+        Appointment booking tool<br>
+        Protocol lookup tool<br>
+        Alert trigger tool
+      </div>
+      <span class="card-tag tag-green">MCP Tools</span>
+    </div>
+    <div class="card c-lime">
+      <div class="card-icon">🧩</div>
+      <div class="card-title">Conversation Memory</div>
+      <div class="card-sub">
+        Session state (Redis)<br>
+        User context cache<br>
+        Multi-turn dialogue<br>
+        Patient context window<br>
+        Cross-session history
+      </div>
+      <span class="card-tag tag-amber">Stateful</span>
+    </div>
+  </div>
+
+  <!-- Routing arrows -->
+  <div style="margin-top:12px;display:flex;gap:10px;align-items:center;justify-content:center;flex-wrap:wrap">
+    <div style="background:#172554;border:1px solid #3b82f660;border-radius:8px;padding:6px 12px;font-size:10px;color:#93c5fd;font-weight:700">🏥 → Citizen Health AI</div>
+    <span style="color:#334155;font-size:18px">→</span>
+    <div style="background:#1e1b4b;border:1px solid #6366f160;border-radius:8px;padding:6px 12px;font-size:10px;color:#c4b5fd;font-weight:700">👩‍⚕️ → Health Worker AI</div>
+    <span style="color:#334155;font-size:18px">→</span>
+    <div style="background:#052e16;border:1px solid #22c55e60;border-radius:8px;padding:6px 12px;font-size:10px;color:#86efac;font-weight:700">🦠 → Disease Surveillance AI</div>
+  </div>
+</div>
+
+<div class="layer-arrow">⬇</div>
+
+<!-- ══════════════════════════════════════════════════ LAYER 5: MICROSERVICES -->
+<div class="layer l-services">
+  <div class="layer-title">
+    <span class="num" style="background:#c2410c;color:#fff">5</span>
+    <span class="icon">🏗️</span>
+    <span style="color:#fb923c">BACKEND MICROSERVICES LAYER</span>
+    <span style="color:#475569;font-weight:400;font-size:10px;margin-left:4px">— Python FastAPI · Async · Containerised</span>
+  </div>
+
+  <div class="modules-row">
+
+    <!-- Citizen Health AI Services -->
+    <div class="module-box citizen">
+      <div class="module-box-title">🏥 Citizen Health AI Services</div>
+      <div class="cards" style="flex-direction:column;gap:8px">
+        <div class="card c-blue">
+          <div style="display:flex;align-items:center;gap:8px">
+            <span style="font-size:16px">🔍</span>
+            <div>
+              <div class="card-title">Hospital Search Service</div>
+              <div class="card-sub">PHC/CHC locator · GPS-aware · Speciality filter</div>
+            </div>
+          </div>
+        </div>
+        <div class="card c-sky">
+          <div style="display:flex;align-items:center;gap:8px">
+            <span style="font-size:16px">📅</span>
+            <div>
+              <div class="card-title">Appointment Booking Service</div>
+              <div class="card-sub">Slot management · IVR booking · OTP confirm</div>
+            </div>
+          </div>
+        </div>
+        <div class="card c-indigo">
+          <div style="display:flex;align-items:center;gap:8px">
+            <span style="font-size:16px">✅</span>
+            <div>
+              <div class="card-title">Eligibility Engine</div>
+              <div class="card-sub">Ayushman Bharat · CMCHIS check · ABHA verify</div>
+            </div>
+          </div>
+        </div>
+        <div class="card c-pink">
+          <div style="display:flex;align-items:center;gap:8px">
+            <span style="font-size:16px">🤰</span>
+            <div>
+              <div class="card-title">Maternal Reminder Service</div>
+              <div class="card-sub">ANC/PNC schedule · Vaccination alerts · SMS</div>
+            </div>
+          </div>
+        </div>
+        <div class="card c-red">
+          <div style="display:flex;align-items:center;gap:8px">
+            <span style="font-size:16px">🚑</span>
+            <div>
+              <div class="card-title">Emergency Assistance</div>
+              <div class="card-sub">108 ambulance routing · Nearest ER · Triage</div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Health Worker AI Services -->
+    <div class="module-box worker">
+      <div class="module-box-title">👩‍⚕️ Health Worker AI Services</div>
+      <div class="cards" style="flex-direction:column;gap:8px">
+        <div class="card c-purple">
+          <div style="display:flex;align-items:center;gap:8px">
+            <span style="font-size:16px">🎙️</span>
+            <div>
+              <div class="card-title">Voice EMR Service</div>
+              <div class="card-sub">Voice → structured record · HL7/FHIR output</div>
+            </div>
+          </div>
+        </div>
+        <div class="card c-indigo">
+          <div style="display:flex;align-items:center;gap:8px">
+            <span style="font-size:16px">📖</span>
+            <div>
+              <div class="card-title">Protocol Assistant</div>
+              <div class="card-sub">NHM treatment guides · Drug dosage · RAG-powered</div>
+            </div>
+          </div>
+        </div>
+        <div class="card c-pink">
+          <div style="display:flex;align-items:center;gap:8px">
+            <span style="font-size:16px">🔁</span>
+            <div>
+              <div class="card-title">Referral Engine</div>
+              <div class="card-sub">AI referral scoring · Hospital routing · Records</div>
+            </div>
+          </div>
+        </div>
+        <div class="card c-purple">
+          <div style="display:flex;align-items:center;gap:8px">
+            <span style="font-size:16px">⚡</span>
+            <div>
+              <div class="card-title">Patient Workflow Automation</div>
+              <div class="card-sub">Visit checklists · Task queues · ASHA incentives</div>
+            </div>
+          </div>
+        </div>
+        <div class="card c-indigo">
+          <div style="display:flex;align-items:center;gap:8px">
+            <span style="font-size:16px">🔄</span>
+            <div>
+              <div class="card-title">FHIR Converter Service</div>
+              <div class="card-sub">HL7 v2 → FHIR R4 · HMIS middleware · ABDM</div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Disease Surveillance AI Services -->
+    <div class="module-box disease">
+      <div class="module-box-title">🦠 Disease Surveillance AI Services</div>
+      <div class="cards" style="flex-direction:column;gap:8px">
+        <div class="card c-green">
+          <div style="display:flex;align-items:center;gap:8px">
+            <span style="font-size:16px">📈</span>
+            <div>
+              <div class="card-title">Disease Analytics Engine</div>
+              <div class="card-sub">Multi-source data fusion · ICD-10 coding</div>
+            </div>
+          </div>
+        </div>
+        <div class="card c-teal">
+          <div style="display:flex;align-items:center;gap:8px">
+            <span style="font-size:16px">🔮</span>
+            <div>
+              <div class="card-title">Outbreak Prediction Service</div>
+              <div class="card-sub">ML time-series · 2–3 wk early warning · ARIMA/LSTM</div>
+            </div>
+          </div>
+        </div>
+        <div class="card c-amber">
+          <div style="display:flex;align-items:center;gap:8px">
+            <span style="font-size:16px">🚨</span>
+            <div>
+              <div class="card-title">Alert Engine</div>
+              <div class="card-sub">DHO notifications · SMS/email/push · Escalation</div>
+            </div>
+          </div>
+        </div>
+        <div class="card c-lime">
+          <div style="display:flex;align-items:center;gap:8px">
+            <span style="font-size:16px">🗺️</span>
+            <div>
+              <div class="card-title">District Trend Monitor</div>
+              <div class="card-sub">Block-level heatmaps · Case density maps</div>
+            </div>
+          </div>
+        </div>
+        <div class="card c-green">
+          <div style="display:flex;align-items:center;gap:8px">
+            <span style="font-size:16px">🌡️</span>
+            <div>
+              <div class="card-title">IHIP Integration Service</div>
+              <div class="card-sub">IHIP data ingest · NHM reporting · HMIS sync</div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+  </div>
+</div>
+
+<div class="layer-arrow">⬇</div>
+
+<!-- ══════════════════════════════════════════════════ LAYER 6: RAG -->
+<div class="layer l-rag">
+  <div class="layer-title">
+    <span class="num" style="background:#0369a1;color:#fff">6</span>
+    <span class="icon">📚</span>
+    <span style="color:#38bdf8">RAG + KNOWLEDGE BASE LAYER</span>
+    <span style="color:#475569;font-weight:400;font-size:10px;margin-left:4px">— Qdrant Vector DB · Embeddings · Semantic Search</span>
+  </div>
+
+  <div class="hflow">
+    <div class="card c-sky" style="flex:0 0 auto;width:140px">
+      <div class="card-icon">❓</div>
+      <div class="card-title">User Query</div>
+      <div class="card-sub">Natural language<br>Voice transcribed</div>
+    </div>
+    <div class="arr">→</div>
+    <div class="card c-cyan" style="flex:0 0 auto;width:150px">
+      <div class="card-icon">⚡</div>
+      <div class="card-title">Sarvam Embeddings</div>
+      <div class="card-sub">Multilingual vectors<br>Semantic encoding</div>
+    </div>
+    <div class="arr">→</div>
+    <div class="card c-sky" style="flex:0 0 auto;width:150px">
+      <div class="card-icon">🔍</div>
+      <div class="card-title">Qdrant Vector Search</div>
+      <div class="card-sub">ANN similarity search<br>Top-K retrieval</div>
+    </div>
+    <div class="arr">→</div>
+    <div class="card c-indigo" style="flex:0 0 auto;width:150px">
+      <div class="card-icon">📄</div>
+      <div class="card-title">Relevant Context</div>
+      <div class="card-sub">Scheme docs<br>Protocol chunks</div>
+    </div>
+    <div class="arr">→</div>
+    <div class="card c-purple" style="flex:0 0 auto;width:160px">
+      <div class="card-icon">🧠</div>
+      <div class="card-title">Sarvam LLM Response</div>
+      <div class="card-sub">Grounded answer<br>Same-language reply</div>
+    </div>
+  </div>
+
+  <div style="margin-top:12px">
+    <div class="section-label" style="background:#0369a122;color:#7dd3fc">Knowledge Sources</div>
+    <div class="cards cols-4">
+      <div class="card c-sky">
+        <div class="card-icon">📜</div>
+        <div class="card-title">Ayushman Bharat / PM-JAY</div>
+        <div class="card-sub">Scheme eligibility rules<br>Benefit packages<br>Empanelled hospitals</div>
+        <span class="card-tag tag-blue">Schemes</span>
+      </div>
+      <div class="card c-cyan">
+        <div class="card-icon">🏥</div>
+        <div class="card-title">CMCHIS / NHM Docs</div>
+        <div class="card-sub">State scheme guidelines<br>Programme circulars<br>Beneficiary criteria</div>
+        <span class="card-tag tag-teal">State Health</span>
+      </div>
+      <div class="card c-indigo">
+        <div class="card-icon">📗</div>
+        <div class="card-title">Treatment Protocols</div>
+        <div class="card-sub">Clinical guidelines<br>Drug dosage charts<br>ICD-10 codes</div>
+        <span class="card-tag tag-purple">Clinical</span>
+      </div>
+      <div class="card c-sky">
+        <div class="card-icon">🏨</div>
+        <div class="card-title">Hospital Dataset</div>
+        <div class="card-sub">PHC/CHC directory<br>Speciality mapping<br>Geo-coordinates</div>
+        <span class="card-tag tag-cyan">Facilities</span>
+      </div>
+    </div>
+  </div>
+</div>
+
+<div class="layer-arrow">⬇</div>
+
+<!-- ══════════════════════════════════════════════════ LAYER 7: DATABASE -->
+<div class="layer l-db">
+  <div class="layer-title">
+    <span class="num" style="background:#a16207;color:#fff">7</span>
+    <span class="icon">🗄️</span>
+    <span style="color:#fbbf24">DATABASE LAYER</span>
+    <span style="color:#475569;font-weight:400;font-size:10px;margin-left:4px">— PostgreSQL · Redis · Background Queues</span>
+  </div>
+  <div class="cards cols-4">
+    <div class="card c-amber">
+      <div class="card-icon">🐘</div>
+      <div class="card-title">PostgreSQL Cluster</div>
+      <div class="card-sub">
+        Citizens · Appointments<br>
+        Patients · Hospitals<br>
+        Referrals · Disease events<br>
+        pgvector extension<br>
+        Primary + Read replicas
+      </div>
+      <span class="card-tag tag-amber">Primary DB</span>
+    </div>
+    <div class="card c-red">
+      <div class="card-icon">⚡</div>
+      <div class="card-title">Redis Cluster</div>
+      <div class="card-sub">
+        Session state cache<br>
+        Conversation memory<br>
+        Rate limiting<br>
+        Pub/Sub events<br>
+        OTP store (TTL)
+      </div>
+      <span class="card-tag tag-red">Cache Layer</span>
+    </div>
+    <div class="card c-amber">
+      <div class="card-icon">📬</div>
+      <div class="card-title">Celery / Redis Queue</div>
+      <div class="card-sub">
+        Async task workers<br>
+        Reminder scheduler<br>
+        Alert dispatch<br>
+        Report generation<br>
+        Bulk SMS tasks
+      </div>
+      <span class="card-tag tag-orange">Task Queue</span>
+    </div>
+    <div class="card c-orange">
+      <div class="card-icon">🗂️</div>
+      <div class="card-title">MinIO / S3 Object Store</div>
+      <div class="card-sub">
+        Voice recordings<br>
+        Patient documents<br>
+        Scheme PDFs<br>
+        Audit logs<br>
+        Encrypted at rest
+      </div>
+      <span class="card-tag tag-amber">Object Store</span>
+    </div>
+  </div>
+</div>
+
+<div class="layer-arrow">⬇</div>
+
+<!-- ══════════════════════════════════════════════════ LAYER 8: ANALYTICS -->
+<div class="layer l-analytics">
+  <div class="layer-title">
+    <span class="num" style="background:#6d28d9;color:#fff">8</span>
+    <span class="icon">📊</span>
+    <span style="color:#c4b5fd">ANALYTICS &amp; SURVEILLANCE LAYER</span>
+  </div>
+  <div class="cards cols-4">
+    <div class="card c-purple">
+      <div class="card-icon">🔮</div>
+      <div class="card-title">Outbreak Prediction ML</div>
+      <div class="card-sub">ARIMA / LSTM time-series<br>Anomaly detection<br>Cluster algorithms<br>R0 estimation</div>
+      <span class="card-tag tag-purple">2–3 Wk Forecast</span>
+    </div>
+    <div class="card c-indigo">
+      <div class="card-icon">🗺️</div>
+      <div class="card-title">Geo Heatmap Engine</div>
+      <div class="card-sub">Block-level density maps<br>Choropleth charts<br>Real-time refresh<br>GeoJSON output</div>
+      <span class="card-tag tag-blue">Heatmaps</span>
+    </div>
+    <div class="card c-purple">
+      <div class="card-icon">🤰</div>
+      <div class="card-title">Maternal Health Monitor</div>
+      <div class="card-sub">ANC/PNC tracking<br>IMR / MMR metrics<br>High-risk flagging<br>Institutional delivery</div>
+      <span class="card-tag tag-purple">Maternal KPIs</span>
+    </div>
+    <div class="card c-pink">
+      <div class="card-icon">📣</div>
+      <div class="card-title">DHO Alert System</div>
+      <div class="card-sub">Auto-generated alerts<br>SMS + Email + Push<br>Escalation matrix<br>Action tracking</div>
+      <span class="card-tag tag-red">Proactive Alerts</span>
+    </div>
+  </div>
+</div>
+
+<div class="layer-arrow">⬇</div>
+
+<!-- ══════════════════════════════════════════════════ LAYERS 9+10: INFRA + SECURITY -->
+<div style="display:grid;grid-template-columns:1fr 1fr;gap:16px">
+
+  <div class="layer l-infra">
+    <div class="layer-title">
+      <span class="num" style="background:#166534;color:#fff">9</span>
+      <span class="icon">☁️</span>
+      <span style="color:#4ade80">INFRASTRUCTURE LAYER</span>
+    </div>
+    <div class="cards cols-2">
+      <div class="card c-green">
+        <div class="card-icon">🐳</div>
+        <div class="card-title">Docker Containers</div>
+        <div class="card-sub">Each service containerised<br>Multi-stage builds<br>Slim images</div>
+      </div>
+      <div class="card c-teal">
+        <div class="card-icon">☸️</div>
+        <div class="card-title">OpenShift / K8s</div>
+        <div class="card-sub">Rolling deployments<br>HPA autoscaling<br>Service mesh</div>
+      </div>
+      <div class="card c-lime">
+        <div class="card-icon">🔄</div>
+        <div class="card-title">CI/CD Pipeline</div>
+        <div class="card-sub">GitHub Actions<br>Automated tests<br>Blue-green deploy</div>
+      </div>
+      <div class="card c-green">
+        <div class="card-icon">⚖️</div>
+        <div class="card-title">Load Balancer</div>
+        <div class="card-sub">Nginx ingress<br>Health checks<br>Horizontal scaling</div>
+      </div>
+    </div>
+  </div>
+
+  <div class="layer l-security">
+    <div class="layer-title">
+      <span class="num" style="background:#991b1b;color:#fff">10</span>
+      <span class="icon">🔐</span>
+      <span style="color:#f87171">SECURITY &amp; COMPLIANCE LAYER</span>
+    </div>
+    <div class="cards cols-2">
+      <div class="card c-red">
+        <div class="card-icon">🔑</div>
+        <div class="card-title">JWT / OAuth2</div>
+        <div class="card-sub">Role-based access<br>Citizen · Worker · Doctor · DHO<br>Token rotation</div>
+      </div>
+      <div class="card c-orange">
+        <div class="card-icon">🔒</div>
+        <div class="card-title">Encrypted Records</div>
+        <div class="card-sub">AES-256 at rest<br>TLS 1.3 in transit<br>ABDM compliance</div>
+      </div>
+      <div class="card c-red">
+        <div class="card-icon">📋</div>
+        <div class="card-title">Audit Logging</div>
+        <div class="card-sub">All access logged<br>Immutable trail<br>DPDP Act ready</div>
+      </div>
+      <div class="card c-amber">
+        <div class="card-icon">🛡️</div>
+        <div class="card-title">ABHA / KYC</div>
+        <div class="card-sub">Identity verification<br>ABDM UHI integration<br>Consent framework</div>
+      </div>
+    </div>
+  </div>
+
+</div>
+
+<div class="layer-arrow">⬇</div>
+
+<!-- ══════════════════════════════════════════════════ LAYER 11: MONITORING -->
+<div class="layer l-monitor">
+  <div class="layer-title">
+    <span class="num" style="background:#0e7490;color:#fff">11</span>
+    <span class="icon">📡</span>
+    <span style="color:#22d3ee">MONITORING &amp; RELIABILITY LAYER</span>
+  </div>
+  <div class="cards cols-5">
+    <div class="card c-cyan">
+      <div class="card-icon">📈</div>
+      <div class="card-title">Prometheus</div>
+      <div class="card-sub">Metrics scraping<br>Custom health metrics<br>Alertmanager rules</div>
+      <span class="card-tag tag-cyan">Metrics</span>
+    </div>
+    <div class="card c-sky">
+      <div class="card-icon">📊</div>
+      <div class="card-title">Grafana Dashboards</div>
+      <div class="card-sub">Service health<br>API latency<br>Voice quality</div>
+      <span class="card-tag tag-blue">Visualisation</span>
+    </div>
+    <div class="card c-cyan">
+      <div class="card-icon">📝</div>
+      <div class="card-title">Centralised Logging</div>
+      <div class="card-sub">ELK / Loki stack<br>Structured JSON logs<br>Trace correlation</div>
+      <span class="card-tag tag-teal">Logging</span>
+    </div>
+    <div class="card c-sky">
+      <div class="card-icon">🔁</div>
+      <div class="card-title">Retry &amp; Circuit Breaker</div>
+      <div class="card-sub">Exponential backoff<br>Fault tolerance<br>Graceful degradation</div>
+      <span class="card-tag tag-cyan">Resilience</span>
+    </div>
+    <div class="card c-indigo">
+      <div class="card-icon">🌐</div>
+      <div class="card-title">Distributed Tracing</div>
+      <div class="card-sub">OpenTelemetry<br>Jaeger / Tempo<br>End-to-end spans</div>
+      <span class="card-tag tag-purple">Tracing</span>
+    </div>
+  </div>
+</div>
+
+<div class="layer-arrow">⬇</div>
+
+<!-- ══════════════════════════════════════════════════ LAYER 12: DATA LAYER -->
+<div class="layer l-db">
+  <div class="layer-title">
+    <span class="num" style="background:#0f766e;color:#fff">12</span>
+    <span class="icon">🏛️</span>
+    <span style="color:#2dd4bf">NATIONAL HEALTH DATA LAYER</span>
+    <span style="color:#475569;font-weight:400;font-size:10px;margin-left:4px">— HMIS-to-Sarvam Middleware · ABDM · CMCHIS · IHIP</span>
+  </div>
+  <div class="cards cols-4">
+    <div class="card c-teal">
+      <div class="card-icon">🏥</div>
+      <div class="card-title">ABDM / ABDM UHI</div>
+      <div class="card-sub">ABHA health ID<br>PHR sharing<br>Federated health records<br>Consent artefacts</div>
+      <span class="card-tag tag-teal">National ID</span>
+    </div>
+    <div class="card c-green">
+      <div class="card-icon">💊</div>
+      <div class="card-title">CMCHIS / Ayushman Bharat</div>
+      <div class="card-sub">Beneficiary database<br>Claim adjudication<br>Empanelled hospital list<br>Real-time eligibility</div>
+      <span class="card-tag tag-green">Insurance</span>
+    </div>
+    <div class="card c-amber">
+      <div class="card-icon">📊</div>
+      <div class="card-title">HMIS Middleware</div>
+      <div class="card-sub">HL7 FHIR bridge<br>NHM data feeds<br>State HMIS adapter<br>Bi-directional sync</div>
+      <span class="card-tag tag-amber">Middleware</span>
+    </div>
+    <div class="card c-lime">
+      <div class="card-icon">🦠</div>
+      <div class="card-title">IHIP Surveillance DB</div>
+      <div class="card-sub">Disease event feed<br>ICD-10 case data<br>Laboratory results<br>Notifiable diseases</div>
+      <span class="card-tag tag-green">IHIP</span>
+    </div>
+  </div>
+</div>
+
+</div><!-- end .diagram -->
+
+<!-- ═══════════════════════════════════════════════════════════ FOOTER -->
+<div class="footer">
+  <strong style="color:#475569">Citizen Health AI Platform</strong> · Serving 7–8 Crore Citizens in Tamil Nadu &amp; Karnataka ·
+  Sarvam AI Stack · LangGraph Orchestration · CloudNative K8s · ABDM Compliant ·
+  <strong style="color:#334155">Version 1.0 — HLD</strong>
+</div>
+
+</body>
+</html>

@@ -1,0 +1,855 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Citizen Health AI Platform — Full Flow HLD</title>
+<style>
+*{box-sizing:border-box;margin:0;padding:0}
+body{background:#050912;font-family:'Segoe UI',system-ui,sans-serif;color:#e2e8f0;min-width:1280px;padding:20px 24px 40px}
+
+/* ─── HEADER ─── */
+.hdr{text-align:center;padding:26px 20px 18px;background:linear-gradient(135deg,#0c1322 0%,#0f2044 50%,#0c1322 100%);border:1px solid #1e40af44;border-radius:14px;margin-bottom:18px;position:relative;overflow:hidden}
+.hdr::before{content:'';position:absolute;inset:0;background:radial-gradient(ellipse at 50% -20%,#1d4ed825 0%,transparent 65%)}
+.hdr h1{font-size:23px;font-weight:900;letter-spacing:.4px;background:linear-gradient(90deg,#60a5fa,#a78bfa,#34d399,#f472b6);-webkit-background-clip:text;-webkit-text-fill-color:transparent;position:relative}
+.hdr p{color:#94a3b8;font-size:12px;margin-top:5px;position:relative}
+.badges{display:flex;gap:7px;justify-content:center;margin-top:10px;flex-wrap:wrap}
+.bdg{padding:3px 10px;border-radius:20px;font-size:9.5px;font-weight:700;letter-spacing:.8px;text-transform:uppercase}
+.b-bl{background:#1d4ed822;border:1px solid #3b82f6;color:#93c5fd}
+.b-gn{background:#06402022;border:1px solid #22c55e;color:#86efac}
+.b-pu{background:#4c1d9522;border:1px solid #8b5cf6;color:#c4b5fd}
+.b-or{background:#7c2d1222;border:1px solid #f97316;color:#fdba74}
+.b-cy{background:#0a2b3622;border:1px solid #06b6d4;color:#67e8f9}
+
+/* ─── E2E FLOW RIBBON ─── */
+.ribbon{display:flex;align-items:center;justify-content:center;gap:5px;flex-wrap:wrap;padding:10px 16px;background:#0c1326;border:1px solid #1e40af44;border-radius:10px;margin-bottom:18px;font-size:10.5px}
+.rs{background:#0f2044;border:1px solid #3b82f640;border-radius:6px;padding:4px 10px;color:#93c5fd;font-weight:700;white-space:nowrap}
+.ra{color:#3b82f6;font-size:16px;font-weight:900}
+
+/* ─── FLOW SECTION LABEL ─── */
+.sec{width:100%;margin-bottom:10px;border-radius:10px;overflow:hidden}
+.sec-hdr{display:flex;align-items:center;gap:8px;padding:7px 14px;font-size:10px;font-weight:900;letter-spacing:1.6px;text-transform:uppercase}
+.sec-body{padding:12px 14px 14px}
+
+/* layer colour themes */
+.th-user    {background:#0a1628;border:1.5px solid #1d4ed855}
+.th-comm    {background:#071a2c;border:1.5px solid #0284c755}
+.th-voice   {background:#0e0620;border:1.5px solid #7c3aed88}
+.th-orch    {background:#041410;border:1.5px solid #059669 88}
+.th-modules {background:#050912;border:none}
+.th-rag     {background:#071828;border:1.5px solid #0369a155}
+.th-db      {background:#140e04;border:1.5px solid #b4530055}
+.th-national{background:#041414;border:1.5px solid #0f766e55}
+.th-infra   {background:#060d18;border:1.5px solid #33415555}
+
+.sh-user    {background:linear-gradient(90deg,#1e3a8a,#1d4ed8);color:#fff}
+.sh-comm    {background:linear-gradient(90deg,#075985,#0284c7);color:#fff}
+.sh-voice   {background:linear-gradient(90deg,#4c1d95,#7c3aed);color:#fff}
+.sh-orch    {background:linear-gradient(90deg,#064e3b,#059669);color:#fff}
+.sh-rag     {background:linear-gradient(90deg,#0c4a6e,#0369a1);color:#fff}
+.sh-db      {background:linear-gradient(90deg,#78350f,#b45309);color:#fff}
+.sh-national{background:linear-gradient(90deg,#134e4a,#0f766e);color:#fff}
+.sh-infra   {background:linear-gradient(90deg,#1e293b,#334155);color:#fff}
+
+/* ─── ARROW CONNECTOR ─── */
+.arr-down{text-align:center;padding:4px 0;font-size:20px;color:#1e3a5f;line-height:1}
+.arr-down span{background:linear-gradient(180deg,#1d4ed8,#4f46e5);-webkit-background-clip:text;-webkit-text-fill-color:transparent;font-size:22px}
+
+/* ─── GRID HELPERS ─── */
+.flex-row{display:flex;gap:10px;flex-wrap:wrap}
+.g2{display:grid;grid-template-columns:repeat(2,1fr);gap:10px}
+.g3{display:grid;grid-template-columns:repeat(3,1fr);gap:10px}
+.g4{display:grid;grid-template-columns:repeat(4,1fr);gap:10px}
+.g5{display:grid;grid-template-columns:repeat(5,1fr);gap:10px}
+.g6{display:grid;grid-template-columns:repeat(6,1fr);gap:10px}
+
+/* ─── COMPONENT CARD ─── */
+.card{border-radius:9px;padding:11px 13px;border:1px solid #ffffff12}
+.card .ci{font-size:18px;margin-bottom:5px}
+.card .ct{font-size:10.5px;font-weight:700;color:#e2e8f0;margin-bottom:3px}
+.card .cs{font-size:9px;color:#94a3b8;line-height:1.55}
+.card .tag{display:inline-block;padding:2px 7px;border-radius:10px;font-size:8px;font-weight:700;letter-spacing:.5px;margin-top:5px;text-transform:uppercase}
+
+/* card fills */
+.cb{background:#172554;border-color:#3b82f644}
+.ci2{background:#1e1b4b;border-color:#6366f144}
+.cp{background:#2e1065;border-color:#a855f744}
+.cg{background:#052e16;border-color:#22c55e44}
+.ct2{background:#042f2e;border-color:#14b8a644}
+.cc{background:#0a2b36;border-color:#06b6d444}
+.co{background:#431407;border-color:#f9731644}
+.ca{background:#3d1a00;border-color:#f59e0b44}
+.cr{background:#3b0a0a;border-color:#ef444444}
+.ck{background:#0f172a;border-color:#47556944}
+.cs2{background:#082f49;border-color:#0ea5e944}
+.cl{background:#162006;border-color:#84cc1644}
+
+/* tag fills */
+.tbl{background:#1d4ed822;border:1px solid #3b82f6;color:#93c5fd}
+.tgn{background:#06402022;border:1px solid #22c55e;color:#86efac}
+.tpu{background:#4c1d9522;border:1px solid #a855f7;color:#d8b4fe}
+.tor{background:#7c2d1222;border:1px solid #f97316;color:#fdba74}
+.ttl{background:#042f2e22;border:1px solid #14b8a6;color:#5eead4}
+.trd{background:#450a0a22;border:1px solid #ef4444;color:#fca5a5}
+.tam{background:#451a0322;border:1px solid #f59e0b;color:#fde68a}
+.tcy{background:#0a2b3622;border:1px solid #06b6d4;color:#67e8f9}
+
+/* ─── SARVAM SPECIAL GLOW ─── */
+.sarvam-glow{box-shadow:0 0 20px #7c3aed33,0 0 40px #7c3aed15;border-color:#7c3aed88 !important}
+.orch-glow{box-shadow:0 0 20px #05966933,0 0 40px #05966915;border-color:#05966988 !important}
+
+/* ─── HORIZONTAL ARROW (within rows) ─── */
+.h-arr{display:flex;align-items:center;justify-content:center;flex-shrink:0;color:#3b82f6;font-size:20px;font-weight:900;padding:0 2px}
+
+/* ─── THREE MODULE COLUMNS ─── */
+.modules-grid{display:grid;grid-template-columns:1fr 1fr 1fr;gap:14px}
+
+.mod-col{border-radius:12px;padding:14px;border:2px solid transparent;position:relative}
+.mod-col::before{content:attr(data-mod);position:absolute;top:-11px;left:50%;transform:translateX(-50%);padding:2px 14px;border-radius:20px;font-size:9px;font-weight:900;letter-spacing:1.2px;text-transform:uppercase;white-space:nowrap}
+
+.mod-citizen{background:linear-gradient(180deg,#0a1628 0%,#071020 100%);border-color:#3b82f655}
+.mod-citizen::before{background:#1d4ed8;color:#fff}
+.mod-worker{background:linear-gradient(180deg,#100a28 0%,#0a0820 100%);border-color:#8b5cf655}
+.mod-worker::before{background:#6d28d9;color:#fff}
+.mod-disease{background:linear-gradient(180deg,#041408 0%,#020c04 100%);border-color:#22c55e55}
+.mod-disease::before{background:#15803d;color:#fff}
+
+.mod-title{font-size:11px;font-weight:900;letter-spacing:1.2px;text-transform:uppercase;margin-bottom:12px;padding:7px 10px;border-radius:7px;text-align:center}
+.mt-citizen{background:#1d4ed822;color:#93c5fd;border:1px solid #3b82f644}
+.mt-worker{background:#6d28d922;color:#c4b5fd;border:1px solid #8b5cf644}
+.mt-disease{background:#15803d22;color:#86efac;border:1px solid #22c55e44}
+
+/* mini vertical flow inside module */
+.mini-flow{display:flex;flex-direction:column;gap:6px}
+.mini-arr{text-align:center;color:#334155;font-size:12px;line-height:1}
+
+/* service card inside module */
+.svc{border-radius:8px;padding:9px 11px;border:1px solid #ffffff0e;display:flex;align-items:flex-start;gap:9px}
+.svc-icon{font-size:16px;flex-shrink:0;margin-top:1px}
+.svc-body .st{font-size:10px;font-weight:700;color:#e2e8f0}
+.svc-body .ss{font-size:8.5px;color:#64748b;margin-top:2px;line-height:1.45}
+.svc-body .stag{display:inline-block;margin-top:4px;padding:1px 6px;border-radius:8px;font-size:7.5px;font-weight:700;letter-spacing:.4px;text-transform:uppercase}
+
+.sc-blue{background:#0f1f40;border-color:#3b82f633}
+.sc-sky {background:#071e30;border-color:#0ea5e933}
+.sc-ind {background:#130d2e;border-color:#6366f133}
+.sc-pur {background:#1a0840;border-color:#a855f733}
+.sc-pnk {background:#28043e;border-color:#ec489933}
+.sc-grn {background:#041a08;border-color:#22c55e33}
+.sc-tel {background:#031a18;border-color:#14b8a633}
+.sc-lim {background:#0c1a02;border-color:#84cc1633}
+.sc-amb {background:#1a0800;border-color:#f59e0b33}
+.sc-red {background:#1a0202;border-color:#ef444433}
+.sc-org {background:#1a0500;border-color:#f9731633}
+
+/* ─── RAG FLOW ─── */
+.rag-flow{display:flex;align-items:stretch;gap:8px}
+.rag-step{flex:1;border-radius:8px;padding:10px 12px;text-align:center;border:1px solid #ffffff12}
+.rag-step .ri{font-size:18px;margin-bottom:4px}
+.rag-step .rt{font-size:10px;font-weight:700;color:#e2e8f0;margin-bottom:3px}
+.rag-step .rs2{font-size:8.5px;color:#64748b;line-height:1.45}
+.rag-arr{display:flex;align-items:center;color:#0369a1;font-size:18px;font-weight:900;flex-shrink:0}
+
+/* ─── DATA LAYER ─── */
+.data-grid{display:grid;grid-template-columns:repeat(5,1fr);gap:10px}
+
+/* ─── NATIONAL DATA ─── */
+.nat-grid{display:grid;grid-template-columns:repeat(4,1fr);gap:10px}
+
+/* ─── INFRA BOTTOM ─── */
+.infra-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:12px}
+.infra-sub{border-radius:8px;padding:10px 12px;border:1px solid #ffffff0e}
+.infra-sub-title{font-size:9px;font-weight:800;letter-spacing:1.2px;text-transform:uppercase;margin-bottom:8px}
+.pill-row{display:flex;flex-wrap:wrap;gap:5px;margin-top:4px}
+.pill{display:inline-flex;align-items:center;gap:4px;padding:3px 8px;border-radius:12px;font-size:9px;font-weight:600;border:1px solid #ffffff15}
+.p-bl{background:#1d4ed818;border-color:#3b82f6;color:#93c5fd}
+.p-gn{background:#06402018;border-color:#22c55e;color:#86efac}
+.p-pu{background:#4c1d9518;border-color:#a855f7;color:#d8b4fe}
+.p-or{background:#7c2d1218;border-color:#f97316;color:#fdba74}
+.p-tl{background:#042f2e18;border-color:#14b8a6;color:#5eead4}
+.p-rd{background:#450a0a18;border-color:#ef4444;color:#fca5a5}
+.p-am{background:#451a0318;border-color:#f59e0b;color:#fde68a}
+.p-cy{background:#0a2b3618;border-color:#06b6d4;color:#67e8f9}
+.p-sk{background:#082f4918;border-color:#0ea5e9;color:#7dd3fc}
+
+/* ─── FOOTER ─── */
+.ftr{text-align:center;margin-top:20px;padding:12px;color:#334155;font-size:9.5px;border-top:1px solid #1e293b}
+</style>
+</head>
+<body>
+
+<!-- ══════════════════════════════════ HEADER -->
+<div class="hdr">
+  <h1>🏥 Citizen Health AI Platform — High-Level Design Flow</h1>
+  <p>AI-Powered Multilingual Rural Healthcare Ecosystem · Tamil Nadu &amp; Karnataka · 7–8 Crore Citizens</p>
+  <div class="badges">
+    <span class="bdg b-pu">Sarvam AI Stack</span>
+    <span class="bdg b-gn">LangGraph Orchestration</span>
+    <span class="bdg b-bl">Voice-First · IVR</span>
+    <span class="bdg b-cy">Tamil · Kannada · Hindi</span>
+    <span class="bdg b-or">3 AI Modules</span>
+  </div>
+</div>
+
+<!-- ══════════════════════════════════ E2E FLOW -->
+<div class="ribbon">
+  <span class="rs">👤 Citizen speaks Tamil/Kannada</span><span class="ra">→</span>
+  <span class="rs">📞 IVR / LiveKit</span><span class="ra">→</span>
+  <span class="rs">🎙️ Saarika STT</span><span class="ra">→</span>
+  <span class="rs">🧠 Sarvam LLM</span><span class="ra">→</span>
+  <span class="rs">⚙️ LangGraph</span><span class="ra">→</span>
+  <span class="rs">🏗️ Microservices</span><span class="ra">→</span>
+  <span class="rs">🗄️ PostgreSQL / Qdrant</span><span class="ra">→</span>
+  <span class="rs">🔊 Bulbul V3 TTS</span><span class="ra">→</span>
+  <span class="rs">🗣️ Citizen hears response</span>
+</div>
+
+<!-- ══════════════════════════════════ LAYER 1 · USER -->
+<div class="sec th-user">
+  <div class="sec-hdr sh-user">
+    <span>👥</span>
+    <span>LAYER 1 — USER INTERFACE LAYER</span>
+    <span style="margin-left:auto;font-size:9px;opacity:.7">Citizens · ASHA Workers · PHC Nurses · District Health Officers</span>
+  </div>
+  <div class="sec-body">
+    <div class="g5">
+      <div class="card cb">
+        <div class="ci">📞</div>
+        <div class="ct">IVR Phone Call</div>
+        <div class="cs">Twilio / Exotel PSTN<br>Toll-free 1800 line<br>No smartphone needed<br>Rural accessibility</div>
+        <span class="tag tgn">Rural-First</span>
+      </div>
+      <div class="card cb">
+        <div class="ci">📱</div>
+        <div class="ct">ASHA Mobile App (Android)</div>
+        <div class="cs">Voice-enabled PWA<br>Tamil/Kannada UI<br>Offline sync<br>Low-bandwidth mode</div>
+        <span class="tag tbl">Offline Capable</span>
+      </div>
+      <div class="card cs2">
+        <div class="ci">🌐</div>
+        <div class="ct">Next.js Web Portal</div>
+        <div class="cs">AI chat widget<br>Portal for citizens<br>Voice-enabled browser<br>Responsive design</div>
+        <span class="tag tbl">React / Next.js</span>
+      </div>
+      <div class="card ci2">
+        <div class="ci">👩‍⚕️</div>
+        <div class="ct">Health Worker Dashboard</div>
+        <div class="cs">ASHA worker portal<br>Referral management<br>Patient lists<br>Voice EMR entry</div>
+        <span class="tag tpu">PHC Nurses</span>
+      </div>
+      <div class="card cg">
+        <div class="ci">🏛️</div>
+        <div class="ct">DHO Government Console</div>
+        <div class="cs">District analytics<br>Disease heatmaps<br>Outbreak monitor<br>NHM KPI reports</div>
+        <span class="tag tgn">District DHO</span>
+      </div>
+    </div>
+  </div>
+</div>
+
+<div class="arr-down"><span>▼</span></div>
+
+<!-- ══════════════════════════════════ LAYER 2 · COMMUNICATION -->
+<div class="sec th-comm">
+  <div class="sec-hdr sh-comm">
+    <span>📡</span>
+    <span>LAYER 2 — COMMUNICATION &amp; REALTIME STREAMING LAYER</span>
+    <span style="margin-left:auto;font-size:9px;opacity:.7">Sub-100ms Latency · Bidirectional Voice · WebRTC</span>
+  </div>
+  <div class="sec-body">
+    <div class="flex-row" style="align-items:center">
+      <div class="card cs2" style="flex:1">
+        <div class="ci">📞</div>
+        <div class="ct">Twilio / Exotel Telephony</div>
+        <div class="cs">PSTN → SIP gateway<br>IVR menu system<br>Call recording<br>SMS delivery</div>
+        <span class="tag tbl">Telephony</span>
+      </div>
+      <div class="h-arr">→</div>
+      <div class="card cc" style="flex:1.3;border-color:#06b6d466 !important;box-shadow:0 0 16px #06b6d422">
+        <div class="ci">🔴</div>
+        <div class="ct">LiveKit Realtime Server</div>
+        <div class="cs">WebRTC audio streaming<br>Server-side VAD<br>Bidirectional audio<br>Room-based sessions<br>Sub-100ms RTT</div>
+        <span class="tag tcy">Realtime Streaming</span>
+      </div>
+      <div class="h-arr">→</div>
+      <div class="card cs2" style="flex:1">
+        <div class="ci">🌉</div>
+        <div class="ct">SIP / WebRTC Bridge</div>
+        <div class="cs">SIP-to-WebRTC adapter<br>Opus audio codec<br>TURN/STUN servers<br>NAT traversal</div>
+        <span class="tag ttl">WebRTC</span>
+      </div>
+      <div class="h-arr">→</div>
+      <div class="card ci2" style="flex:1">
+        <div class="ci">🔗</div>
+        <div class="ct">API Gateway (Nginx)</div>
+        <div class="cs">Rate limiting<br>SSL termination<br>Request routing<br>Load balancing</div>
+        <span class="tag tpu">Secure Tunnel</span>
+      </div>
+      <div class="h-arr">→</div>
+      <div class="card ct2" style="flex:1">
+        <div class="ci">🔔</div>
+        <div class="ct">SMS / WhatsApp Push</div>
+        <div class="cs">Maternal reminders<br>Appointment alerts<br>NHM notifications<br>OTP delivery</div>
+        <span class="tag ttl">Push Alerts</span>
+      </div>
+    </div>
+  </div>
+</div>
+
+<div class="arr-down"><span>▼</span></div>
+
+<!-- ══════════════════════════════════ LAYER 3 · SARVAM VOICE AI -->
+<div class="sec th-voice sarvam-glow">
+  <div class="sec-hdr sh-voice">
+    <span>🎙️</span>
+    <span>LAYER 3 — SARVAM AI VOICE STACK</span>
+    <span style="margin-left:auto;font-size:9px;opacity:.85">🇮🇳 Auto-detect &amp; respond in Tamil · Kannada · Hindi · Hinglish</span>
+  </div>
+  <div class="sec-body">
+    <div class="flex-row" style="align-items:stretch">
+      <div class="card cp" style="flex:1;border-color:#a855f766 !important">
+        <div class="ci">🎙️</div>
+        <div class="ct">Sarvam Saarika — STT</div>
+        <div class="cs">
+          Multilingual ASR<br>
+          Auto language detection<br>
+          Tamil / Kannada / Hindi<br>
+          Hinglish code-switch<br>
+          Streaming speech-to-text<br>
+          Noise-robust (rural env.)<br>
+          PSTN audio quality
+        </div>
+        <span class="tag tpu">Speech-to-Text</span>
+      </div>
+      <div class="h-arr">→</div>
+      <div class="card ci2" style="flex:0 0 120px;text-align:center;display:flex;flex-direction:column;align-items:center;justify-content:center;border-color:#6366f166 !important">
+        <div style="font-size:26px">🔍</div>
+        <div class="ct" style="text-align:center">Language<br>Detect</div>
+        <div class="cs" style="text-align:center;margin-top:4px">Tamil<br>Kannada<br>Hindi<br>Hinglish</div>
+        <span class="tag tbl" style="margin-top:6px">Auto</span>
+      </div>
+      <div class="h-arr">→</div>
+      <div class="card cp" style="flex:1.4;border-color:#a855f788 !important;box-shadow:0 0 24px #a855f722">
+        <div class="ci">🧠</div>
+        <div class="ct">Sarvam Multilingual LLM</div>
+        <div class="cs">
+          Intent recognition<br>
+          Contextual healthcare reasoning<br>
+          Multi-turn conversation<br>
+          NHM / CMCHIS knowledge<br>
+          Same-language response<br>
+          Clinical decision support<br>
+          Hallucination-safe grounding
+        </div>
+        <span class="tag tpu">Core LLM · Orchestrator</span>
+      </div>
+      <div class="h-arr">→</div>
+      <div class="card ci2" style="flex:0 0 120px;text-align:center;display:flex;flex-direction:column;align-items:center;justify-content:center;border-color:#6366f166 !important">
+        <div style="font-size:26px">📝</div>
+        <div class="ct" style="text-align:center">Sarvam<br>Translate</div>
+        <div class="cs" style="text-align:center;margin-top:4px">Cross-lingual<br>bridging<br>if needed</div>
+        <span class="tag tbl" style="margin-top:6px">Translate</span>
+      </div>
+      <div class="h-arr">→</div>
+      <div class="card cp" style="flex:1;border-color:#a855f766 !important">
+        <div class="ci">🔊</div>
+        <div class="ct">Sarvam Bulbul V3 — TTS</div>
+        <div class="cs">
+          Natural voice synthesis<br>
+          Tamil / Kannada / Hindi<br>
+          Streaming realtime TTS<br>
+          Female / Male voices<br>
+          Rural-friendly diction<br>
+          Low-latency playback<br>
+          IVR-optimised output
+        </div>
+        <span class="tag tpu">Text-to-Speech</span>
+      </div>
+    </div>
+  </div>
+</div>
+
+<div class="arr-down"><span>▼</span></div>
+
+<!-- ══════════════════════════════════ LAYER 4 · ORCHESTRATION -->
+<div class="sec th-orch orch-glow">
+  <div class="sec-hdr sh-orch">
+    <span>⚙️</span>
+    <span>LAYER 4 — AI ORCHESTRATION HUB</span>
+    <span style="margin-left:auto;font-size:9px;opacity:.85">LangGraph · MCP Tools · Intent Router · Conversation Memory</span>
+  </div>
+  <div class="sec-body">
+    <div class="g4">
+      <div class="card cg" style="border-color:#22c55e66 !important">
+        <div class="ci">🕸️</div>
+        <div class="ct">LangGraph Engine</div>
+        <div class="cs">Stateful workflow graphs<br>Multi-agent coordination<br>Conditional branching<br>Async parallel execution<br>Error recovery loops<br>Streaming output</div>
+        <span class="tag tgn">Orchestrator</span>
+      </div>
+      <div class="card ct2" style="border-color:#14b8a666 !important">
+        <div class="ci">🔀</div>
+        <div class="ct">Intent Router</div>
+        <div class="cs">
+          <b style="color:#86efac">→ Citizen Health AI</b><br>
+          <b style="color:#c4b5fd">→ Health Worker AI</b><br>
+          <b style="color:#4ade80">→ Disease Surveillance</b><br>
+          Confidence scoring<br>Fallback &amp; escalation
+        </div>
+        <span class="tag ttl">Smart Router</span>
+      </div>
+      <div class="card cg" style="border-color:#22c55e55 !important">
+        <div class="ci">🛠️</div>
+        <div class="ct">MCP Tool Calling</div>
+        <div class="cs">Hospital search tool<br>Eligibility check tool<br>Appointment booking tool<br>Protocol lookup tool<br>Alert trigger tool<br>EMR update tool</div>
+        <span class="tag tgn">MCP Tools</span>
+      </div>
+      <div class="card ct2" style="border-color:#14b8a655 !important">
+        <div class="ci">🧩</div>
+        <div class="ct">Conversation Memory</div>
+        <div class="cs">Session state (Redis)<br>User context cache<br>Multi-turn dialogue<br>Patient context window<br>Cross-session history<br>ABHA-linked identity</div>
+        <span class="tag ttl">Stateful</span>
+      </div>
+    </div>
+  </div>
+</div>
+
+<div class="arr-down"><span>▼</span></div>
+
+<!-- ══════════════════════════════════ LAYER 5 · THREE MODULES -->
+<div class="sec th-modules" style="padding:0">
+  <div style="padding:0 0 6px;display:flex;align-items:center;justify-content:center;gap:30px;font-size:10px;color:#475569;letter-spacing:1px;text-transform:uppercase;font-weight:800">
+    <span style="color:#3b82f6">▼ Citizen Health AI</span>
+    <span style="color:#334155">|</span>
+    <span style="color:#8b5cf6">▼ Health Worker AI</span>
+    <span style="color:#334155">|</span>
+    <span style="color:#22c55e">▼ Disease Surveillance AI</span>
+  </div>
+  <div class="modules-grid">
+
+    <!-- ── MODULE 1: CITIZEN HEALTH AI ── -->
+    <div class="mod-col mod-citizen" data-mod="🏥 Citizen Health AI">
+      <div class="mod-title mt-citizen">🏥 Citizen Health AI — FastAPI Services</div>
+      <div class="mini-flow">
+
+        <div class="svc sc-blue">
+          <div class="svc-icon">🔍</div>
+          <div class="svc-body">
+            <div class="st">Hospital Search Service</div>
+            <div class="ss">PHC/CHC locator · GPS-aware · Speciality filter · Nearest facility</div>
+            <span class="stag tbl">GPS Search</span>
+          </div>
+        </div>
+        <div class="mini-arr">↓</div>
+
+        <div class="svc sc-sky">
+          <div class="svc-icon">📅</div>
+          <div class="svc-body">
+            <div class="st">Appointment Booking Service</div>
+            <div class="ss">Slot management · IVR booking · OTP confirm · Reminder dispatch</div>
+            <span class="stag tbl">Booking</span>
+          </div>
+        </div>
+        <div class="mini-arr">↓</div>
+
+        <div class="svc sc-ind">
+          <div class="svc-icon">✅</div>
+          <div class="svc-body">
+            <div class="st">Eligibility Engine</div>
+            <div class="ss">Ayushman Bharat · CMCHIS check · ABHA verify · Benefit lookup</div>
+            <span class="stag tgn">Eligibility</span>
+          </div>
+        </div>
+        <div class="mini-arr">↓</div>
+
+        <div class="svc sc-blue">
+          <div class="svc-icon">🤰</div>
+          <div class="svc-body">
+            <div class="st">Maternal Reminder Service</div>
+            <div class="ss">ANC/PNC schedule · Vaccination alerts · IVR/SMS reminders</div>
+            <span class="stag tpu">Maternal</span>
+          </div>
+        </div>
+        <div class="mini-arr">↓</div>
+
+        <div class="svc sc-red">
+          <div class="svc-icon">🚑</div>
+          <div class="svc-body">
+            <div class="st">Emergency Assistance Service</div>
+            <div class="ss">108 ambulance routing · Nearest ER · Basic triage guidance</div>
+            <span class="stag trd">Emergency</span>
+          </div>
+        </div>
+        <div class="mini-arr">↓</div>
+
+        <div class="svc sc-sky">
+          <div class="svc-icon">📋</div>
+          <div class="svc-body">
+            <div class="st">NHM Programme Query</div>
+            <div class="ss">Scheme information · RAG-grounded answers · FAQ resolution</div>
+            <span class="stag ttl">RAG-Powered</span>
+          </div>
+        </div>
+
+      </div>
+    </div>
+
+    <!-- ── MODULE 2: HEALTH WORKER AI ── -->
+    <div class="mod-col mod-worker" data-mod="👩‍⚕️ Health Worker AI">
+      <div class="mod-title mt-worker">👩‍⚕️ Health Worker AI — FastAPI Services</div>
+      <div class="mini-flow">
+
+        <div class="svc sc-pur">
+          <div class="svc-icon">🎙️</div>
+          <div class="svc-body">
+            <div class="st">Voice EMR Service</div>
+            <div class="ss">Voice → structured record · HL7/FHIR R4 output · Tamil/Kannada input</div>
+            <span class="stag tpu">Voice EMR</span>
+          </div>
+        </div>
+        <div class="mini-arr">↓</div>
+
+        <div class="svc sc-ind">
+          <div class="svc-icon">📖</div>
+          <div class="svc-body">
+            <div class="st">Protocol Assistant</div>
+            <div class="ss">NHM treatment guides · Drug dosage · Clinical decision support · RAG</div>
+            <span class="stag tpu">GenAI Assist</span>
+          </div>
+        </div>
+        <div class="mini-arr">↓</div>
+
+        <div class="svc sc-pnk">
+          <div class="svc-icon">🔁</div>
+          <div class="svc-body">
+            <div class="st">Referral Engine</div>
+            <div class="ss">AI referral scoring · Hospital routing · Transfer records · Escalation</div>
+            <span class="stag tpu">Referrals</span>
+          </div>
+        </div>
+        <div class="mini-arr">↓</div>
+
+        <div class="svc sc-pur">
+          <div class="svc-icon">⚡</div>
+          <div class="svc-body">
+            <div class="st">Patient Workflow Automation</div>
+            <div class="ss">Visit checklists · Task queues · ASHA incentive tracking · Celery</div>
+            <span class="stag ttl">Automation</span>
+          </div>
+        </div>
+        <div class="mini-arr">↓</div>
+
+        <div class="svc sc-ind">
+          <div class="svc-icon">🔄</div>
+          <div class="svc-body">
+            <div class="st">FHIR Converter Service</div>
+            <div class="ss">HL7 v2 → FHIR R4 · HMIS middleware adapter · ABDM sync</div>
+            <span class="stag tbl">FHIR</span>
+          </div>
+        </div>
+        <div class="mini-arr">↓</div>
+
+        <div class="svc sc-pnk">
+          <div class="svc-icon">💊</div>
+          <div class="svc-body">
+            <div class="st">Drug &amp; Supply Tracker</div>
+            <div class="ss">PHC inventory alerts · Stockout warnings · Requisition workflow</div>
+            <span class="stag tpu">Inventory</span>
+          </div>
+        </div>
+
+      </div>
+    </div>
+
+    <!-- ── MODULE 3: DISEASE SURVEILLANCE AI ── -->
+    <div class="mod-col mod-disease" data-mod="🦠 Disease Surveillance AI">
+      <div class="mod-title mt-disease">🦠 Disease Surveillance AI — FastAPI Services</div>
+      <div class="mini-flow">
+
+        <div class="svc sc-grn">
+          <div class="svc-icon">📈</div>
+          <div class="svc-body">
+            <div class="st">Disease Analytics Engine</div>
+            <div class="ss">Multi-source data fusion · ICD-10 coding · Case aggregation · Trend</div>
+            <span class="stag tgn">Analytics</span>
+          </div>
+        </div>
+        <div class="mini-arr">↓</div>
+
+        <div class="svc sc-tel">
+          <div class="svc-icon">🔮</div>
+          <div class="svc-body">
+            <div class="st">Outbreak Prediction Service</div>
+            <div class="ss">ARIMA / LSTM time-series · Anomaly detection · 2–3 wk early warning</div>
+            <span class="stag tgn">ML · Forecast</span>
+          </div>
+        </div>
+        <div class="mini-arr">↓</div>
+
+        <div class="svc sc-amb">
+          <div class="svc-icon">🚨</div>
+          <div class="svc-body">
+            <div class="st">Alert Engine</div>
+            <div class="ss">DHO notifications · SMS/email/push · Tiered escalation · Auto-generate</div>
+            <span class="stag tam">Alerts</span>
+          </div>
+        </div>
+        <div class="mini-arr">↓</div>
+
+        <div class="svc sc-grn">
+          <div class="svc-icon">🗺️</div>
+          <div class="svc-body">
+            <div class="st">District Trend Monitor</div>
+            <div class="ss">Block-level heatmaps · Case density maps · GeoJSON · Real-time refresh</div>
+            <span class="stag tgn">Heatmaps</span>
+          </div>
+        </div>
+        <div class="mini-arr">↓</div>
+
+        <div class="svc sc-lim">
+          <div class="svc-icon">🌡️</div>
+          <div class="svc-body">
+            <div class="st">IHIP Integration Service</div>
+            <div class="ss">IHIP data ingest · Notifiable disease reporting · NHM feeds · HMIS</div>
+            <span class="stag tgn">IHIP</span>
+          </div>
+        </div>
+        <div class="mini-arr">↓</div>
+
+        <div class="svc sc-tel">
+          <div class="svc-icon">📊</div>
+          <div class="svc-body">
+            <div class="st">Maternal &amp; IMR Monitor</div>
+            <div class="ss">ANC/PNC coverage · IMR / MMR tracking · High-risk zone flagging</div>
+            <span class="stag ttl">Maternal KPIs</span>
+          </div>
+        </div>
+
+      </div>
+    </div>
+
+  </div>
+</div>
+
+<div class="arr-down"><span>▼</span></div>
+
+<!-- ══════════════════════════════════ LAYER 6 · RAG -->
+<div class="sec th-rag">
+  <div class="sec-hdr sh-rag">
+    <span>📚</span>
+    <span>LAYER 6 — RAG ENGINE &amp; KNOWLEDGE BASE</span>
+    <span style="margin-left:auto;font-size:9px;opacity:.7">Qdrant Vector DB · Sarvam Embeddings · Semantic Search · Grounded Responses</span>
+  </div>
+  <div class="sec-body">
+    <div class="rag-flow" style="margin-bottom:12px">
+      <div class="rag-step cs2">
+        <div class="ri">❓</div>
+        <div class="rt">User Query</div>
+        <div class="rs2">Natural language<br>Voice transcribed</div>
+      </div>
+      <div class="rag-arr">→</div>
+      <div class="rag-step cc">
+        <div class="ri">⚡</div>
+        <div class="rt">Sarvam Embeddings</div>
+        <div class="rs2">Multilingual vectors<br>Semantic encoding</div>
+      </div>
+      <div class="rag-arr">→</div>
+      <div class="rag-step cs2">
+        <div class="ri">🔍</div>
+        <div class="rt">Qdrant Vector Search</div>
+        <div class="rs2">ANN similarity<br>Top-K retrieval</div>
+      </div>
+      <div class="rag-arr">→</div>
+      <div class="rag-step ci2">
+        <div class="ri">📄</div>
+        <div class="rt">Context Chunks</div>
+        <div class="rs2">Relevant scheme docs<br>Protocol excerpts</div>
+      </div>
+      <div class="rag-arr">→</div>
+      <div class="rag-step cp">
+        <div class="ri">🧠</div>
+        <div class="rt">Sarvam LLM Response</div>
+        <div class="rs2">Grounded answer<br>Same-language reply</div>
+      </div>
+    </div>
+    <div class="g4">
+      <div class="card cs2">
+        <div class="ci">📜</div>
+        <div class="ct">Ayushman Bharat / PM-JAY</div>
+        <div class="cs">Eligibility rules · Benefit packages · Empanelled hospitals · Claim rules</div>
+        <span class="tag tbl">Schemes</span>
+      </div>
+      <div class="card cc">
+        <div class="ci">🏥</div>
+        <div class="ct">CMCHIS / NHM Documents</div>
+        <div class="cs">State scheme guidelines · Programme circulars · Beneficiary criteria</div>
+        <span class="tag ttl">State Health</span>
+      </div>
+      <div class="card ci2">
+        <div class="ci">📗</div>
+        <div class="ct">Treatment Protocols</div>
+        <div class="cs">Clinical guidelines · Drug dosage charts · ICD-10 · NHM protocols</div>
+        <span class="tag tpu">Clinical</span>
+      </div>
+      <div class="card cs2">
+        <div class="ci">🏨</div>
+        <div class="ct">Hospital &amp; PHC Directory</div>
+        <div class="cs">PHC/CHC directory · Speciality map · Geo-coordinates · Timings</div>
+        <span class="tag tcy">Facilities</span>
+      </div>
+    </div>
+  </div>
+</div>
+
+<div class="arr-down"><span>▼</span></div>
+
+<!-- ══════════════════════════════════ LAYER 7 · DATABASE -->
+<div class="sec th-db">
+  <div class="sec-hdr sh-db">
+    <span>🗄️</span>
+    <span>LAYER 7 — DATABASE &amp; STORAGE LAYER</span>
+    <span style="margin-left:auto;font-size:9px;opacity:.7">PostgreSQL · Redis · Celery · MinIO · pgvector</span>
+  </div>
+  <div class="sec-body">
+    <div class="data-grid">
+      <div class="card ca">
+        <div class="ci">🐘</div>
+        <div class="ct">PostgreSQL Cluster</div>
+        <div class="cs">Citizens · Appointments<br>Patients · Hospitals<br>Referrals · Disease events<br>pgvector extension<br>Primary + Read replicas</div>
+        <span class="tag tam">Primary DB</span>
+      </div>
+      <div class="card cr">
+        <div class="ci">⚡</div>
+        <div class="ct">Redis Cluster</div>
+        <div class="cs">Session state cache<br>Conversation memory<br>Rate limiting<br>Pub/Sub events<br>OTP store (TTL 5m)</div>
+        <span class="tag trd">Cache</span>
+      </div>
+      <div class="card ca">
+        <div class="ci">📬</div>
+        <div class="ct">Celery Task Queue</div>
+        <div class="cs">Async task workers<br>Reminder scheduler<br>Alert dispatch queue<br>Report generation<br>Bulk SMS/IVR tasks</div>
+        <span class="tag tor">Task Queue</span>
+      </div>
+      <div class="card co">
+        <div class="ci">🗂️</div>
+        <div class="ct">MinIO / S3 Object Store</div>
+        <div class="cs">Voice recordings<br>Patient documents<br>Scheme PDFs<br>Audit log archives<br>AES-256 encrypted</div>
+        <span class="tag tam">Object Store</span>
+      </div>
+      <div class="card ci2">
+        <div class="ci">🔷</div>
+        <div class="ct">Qdrant Vector DB</div>
+        <div class="cs">Knowledge embeddings<br>Scheme vectors<br>Protocol vectors<br>Similarity search<br>Multilingual index</div>
+        <span class="tag tbl">Vector DB</span>
+      </div>
+    </div>
+  </div>
+</div>
+
+<div class="arr-down"><span>▼</span></div>
+
+<!-- ══════════════════════════════════ LAYER 8 · NATIONAL DATA -->
+<div class="sec th-national">
+  <div class="sec-hdr sh-national">
+    <span>🏛️</span>
+    <span>LAYER 8 — NATIONAL HEALTH DATA SOURCES</span>
+    <span style="margin-left:auto;font-size:9px;opacity:.7">HMIS-to-Sarvam Middleware · ABDM · CMCHIS · IHIP · Ayushman Bharat</span>
+  </div>
+  <div class="sec-body">
+    <div class="nat-grid">
+      <div class="card ct2">
+        <div class="ci">🆔</div>
+        <div class="ct">ABDM / ABDM UHI</div>
+        <div class="cs">ABHA health ID registry<br>PHR sharing consent<br>Federated health records<br>Consent artefacts<br>KYC verification</div>
+        <span class="tag ttl">National ID</span>
+      </div>
+      <div class="card cg">
+        <div class="ci">💊</div>
+        <div class="ct">CMCHIS / Ayushman Bharat</div>
+        <div class="cs">Beneficiary database<br>Claim adjudication<br>Empanelled hospitals<br>Real-time eligibility<br>PM-JAY integration</div>
+        <span class="tag tgn">Insurance</span>
+      </div>
+      <div class="card ca">
+        <div class="ci">🔄</div>
+        <div class="ct">HMIS Middleware Layer</div>
+        <div class="cs">HL7 FHIR R4 bridge<br>NHM data sync feeds<br>State HMIS adapter<br>Bi-directional sync<br>Event streaming</div>
+        <span class="tag tam">Middleware</span>
+      </div>
+      <div class="card cl">
+        <div class="ci">🦠</div>
+        <div class="ct">IHIP Surveillance DB</div>
+        <div class="cs">Disease event feed<br>ICD-10 case data<br>Laboratory results<br>Notifiable diseases<br>IDSP integration</div>
+        <span class="tag tgn">IHIP / IDSP</span>
+      </div>
+    </div>
+  </div>
+</div>
+
+<div class="arr-down"><span>▼</span></div>
+
+<!-- ══════════════════════════════════ LAYER 9 · INFRA + SECURITY + MONITORING -->
+<div class="sec th-infra">
+  <div class="sec-hdr sh-infra">
+    <span>☁️</span>
+    <span>LAYER 9 — INFRASTRUCTURE · SECURITY · MONITORING</span>
+    <span style="margin-left:auto;font-size:9px;opacity:.7">K8s · Docker · JWT · Prometheus · Grafana · OpenTelemetry</span>
+  </div>
+  <div class="sec-body">
+    <div class="infra-grid">
+
+      <div class="infra-sub" style="background:#0a1208;border-color:#22c55e22">
+        <div class="infra-sub-title" style="color:#4ade80">☸️ Infrastructure &amp; Deployment</div>
+        <div class="pill-row">
+          <span class="pill p-gn">🐳 Docker Containers</span>
+          <span class="pill p-gn">☸️ OpenShift / Kubernetes</span>
+          <span class="pill p-gn">⚖️ HPA Autoscaling</span>
+          <span class="pill p-gn">🔄 Rolling Deployments</span>
+          <span class="pill p-gn">🔁 CI/CD (GitHub Actions)</span>
+          <span class="pill p-gn">🌐 Nginx Ingress</span>
+          <span class="pill p-gn">☁️ Cloud-Native</span>
+          <span class="pill p-tl">📦 Helm Charts</span>
+        </div>
+      </div>
+
+      <div class="infra-sub" style="background:#120808;border-color:#ef444422">
+        <div class="infra-sub-title" style="color:#f87171">🔐 Security &amp; Compliance</div>
+        <div class="pill-row">
+          <span class="pill p-rd">🔑 JWT / OAuth2</span>
+          <span class="pill p-rd">👥 RBAC (Citizen/Worker/DHO)</span>
+          <span class="pill p-rd">🔒 AES-256 At Rest</span>
+          <span class="pill p-rd">🛡️ TLS 1.3 In Transit</span>
+          <span class="pill p-rd">📋 Audit Logging</span>
+          <span class="pill p-rd">🆔 ABHA/KYC</span>
+          <span class="pill p-rd">📜 DPDP Act Compliant</span>
+          <span class="pill p-am">🔰 ABDM Guidelines</span>
+        </div>
+      </div>
+
+      <div class="infra-sub" style="background:#060e18;border-color:#06b6d422">
+        <div class="infra-sub-title" style="color:#22d3ee">📡 Monitoring &amp; Reliability</div>
+        <div class="pill-row">
+          <span class="pill p-cy">📈 Prometheus Metrics</span>
+          <span class="pill p-cy">📊 Grafana Dashboards</span>
+          <span class="pill p-cy">📝 ELK / Loki Logging</span>
+          <span class="pill p-cy">🔭 OpenTelemetry Tracing</span>
+          <span class="pill p-cy">🔁 Circuit Breaker</span>
+          <span class="pill p-cy">⏮️ Retry Queues</span>
+          <span class="pill p-sk">🔎 Jaeger Tracing</span>
+          <span class="pill p-bl">💬 Alertmanager</span>
+        </div>
+      </div>
+
+    </div>
+  </div>
+</div>
+
+<!-- ══════════════════════════════════ FOOTER -->
+<div class="ftr">
+  <strong style="color:#475569">Citizen Health AI Platform · All Three Modules in Single Flow</strong>
+  &nbsp;·&nbsp; Sarvam AI Stack (Saarika STT · Sarvam LLM · Bulbul V3 TTS)
+  &nbsp;·&nbsp; LangGraph Orchestration · Python FastAPI Microservices
+  &nbsp;·&nbsp; ABDM · CMCHIS · Ayushman Bharat · IHIP Compliant
+  &nbsp;·&nbsp; <strong style="color:#334155">© 2025 — HLD v2.0</strong>
+</div>
+
+</body>
+</html>
