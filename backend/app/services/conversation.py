@@ -37,6 +37,13 @@ _INTRO_TEXTS: dict[str, str] = {
         "ಡಾಕ್ಟರ್ ಅಪಾಯಿಂಟ್ಮೆಂಟ್ ಬುಕಿಂಗ್, ಮತ್ತು ತಾಯಿ ಆರೋಗ್ಯ ರಿಮೈಂಡರ್‌ಗಳಲ್ಲಿ "
         "ಸಹಾಯ ಮಾಡಲು ಇಲ್ಲಿದ್ದೇನೆ. ನಿಮಗೆ ಏನು ಬೇಕು?"
     ),
+    "hi-IN": (
+        "नमस्ते! मैं Citizen Health AI हूँ। "
+        "मैं आपकी मदद कर सकता हूँ — अस्पताल में रास्ता दिखाने, "
+        "Ayushman Bharat और CMCHIS पात्रता जाँचने, "
+        "डॉक्टर का appointment बुक करने, और मातृ स्वास्थ्य reminders सेट करने में। "
+        "आज मैं आपकी कैसे मदद कर सकता हूँ?"
+    ),
     "en-IN": (
         "Hello! I'm Citizen Health AI. "
         "I'm here to help you with hospital navigation, Ayushman Bharat and CMCHIS "
@@ -85,7 +92,7 @@ class ConversationService:
 
     async def start_session(
         self,
-        phone_number: str | None,
+        phone_number: str | None,  # noqa: ARG002 — reserved for future citizen pre-fetch
         language_code: str,
     ) -> SessionStartResponse:
         language_code = self._normalise_language(language_code)
@@ -267,6 +274,7 @@ class ConversationService:
             suffix = {
                 "ta-IN": " உங்கள் கோரிக்கை அருகிலுள்ள சுகாதார பணியாளருக்கு அனுப்பப்பட்டது.",
                 "kn-IN": " ನಿಮ್ಮ ವಿನಂತಿಯನ್ನು ಸಮೀಪದ ಆರೋಗ್ಯ ಕಾರ್ಯಕರ್ತರಿಗೆ ಕಳುಹಿಸಲಾಗಿದೆ.",
+                "hi-IN": " आपका अनुरोध नजदीकी स्वास्थ्य कार्यकर्ता को भेज दिया गया है।",
             }.get(language_code, " Your request has been sent to the nearest health worker.")
             return response + suffix
         return response
@@ -277,4 +285,11 @@ class ConversationService:
             return "ta-IN"
         if language_code.startswith("kn"):
             return "kn-IN"
-        return "en-IN"
+        if language_code.startswith("hi"):
+            return "hi-IN"
+        if language_code.startswith("en"):
+            return "en-IN"
+        # Any other Indian language from Sarvam STT (te, ml, gu, mr, bn, …).
+        # Reconstruct as proper BCP-47 with uppercase region.
+        parts = language_code.split("-")
+        return f"{parts[0]}-{parts[1].upper()}" if len(parts) == 2 else f"{parts[0]}-IN"

@@ -600,9 +600,10 @@ export function VoiceConsole() {
           <label>
             Language
             <select value={languageCode} onChange={e => setLanguageCode(e.target.value)}>
+              <option value="en-IN">English</option>
+              <option value="hi-IN">Hindi / Hinglish</option>
               <option value="ta-IN">Tamil</option>
               <option value="kn-IN">Kannada</option>
-              <option value="en-IN">English</option>
             </select>
           </label>
           <label>

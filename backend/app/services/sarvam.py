@@ -108,7 +108,8 @@ class SarvamService:
         if not self.configured:
             return None
 
-        target_language_code = language_code if language_code in {"ta-IN", "kn-IN", "en-IN"} else "ta-IN"
+        _tts_supported = {"ta-IN", "kn-IN", "hi-IN", "en-IN", "te-IN", "ml-IN", "gu-IN", "mr-IN", "bn-IN"}
+        target_language_code = language_code if language_code in _tts_supported else "hi-IN"
         payload = {
             "text": text[:2400],
             "target_language_code": target_language_code,
@@ -148,45 +149,86 @@ class SarvamService:
 
     def _fallback_turn(self, transcript: str, language_code: str) -> dict[str, Any]:
         text = transcript.lower()
-        tamil_or_kannada = transcript
-        if any(word in text for word in ["appointment", "book", "doctor", "slot"]) or any(
-            word in tamil_or_kannada
-            for word in ["அப்பாயின்மென்ட்", "டாக்டர்", "மருத்துவர்", "ಅಪಾಯಿಂಟ್ಮೆಂಟ್", "ವೈದ್ಯ", "ಡಾಕ್ಟರ್"]
-        ):
+        script = transcript  # original for script-based matching
+
+        # ── Intent detection (multilingual keywords) ─────────────────
+        appt_en  = any(w in text for w in ["appointment", "book", "doctor", "slot"])
+        appt_ta  = any(w in script for w in ["அப்பாயின்மென்ட்", "டாக்டர்", "மருத்துவர்"])
+        appt_kn  = any(w in script for w in ["ಅಪಾಯಿಂಟ್ಮೆಂಟ್", "ವೈದ್ಯ", "ಡಾಕ್ಟರ್"])
+        appt_hi  = any(w in text for w in ["appointment", "doctor", "डॉक्टर", "अपॉइंटमेंट", "बुक", "slot"])
+
+        elig_en  = any(w in text for w in ["ayushman", "cmchis", "insurance", "eligible"])
+        elig_hi  = any(w in text for w in ["ayushman", "cmchis", "पात्रता", "eligible", "बीमा"])
+
+        maternal_en = any(w in text for w in ["pregnant", "mother", "anc", "vaccine", "reminder"])
+        maternal_ta = any(w in script for w in ["கர்ப்ப", "தடுப்பூசி", "நினைவூட்டல்"])
+        maternal_kn = any(w in script for w in ["ಗರ್ಭಿಣಿ", "ಲಸಿಕೆ", "ರಿಮೈಂಡರ್"])
+        maternal_hi = any(w in text for w in ["pregnant", "गर्भ", "टीका", "vaccine", "reminder", "anc", "माँ"])
+
+        emerg_en = any(w in text for w in ["emergency", "chest pain", "bleeding", "breath"])
+        emerg_hi = any(w in text for w in ["emergency", "दर्द", "खून", "सांस", "emergency"])
+
+        nav_en   = any(w in text for w in ["counter", "floor", "room", "where", "navigation"])
+        nav_ta   = any(w in script for w in ["எங்கே", "கவுண்டர்", "அறை"])
+        nav_kn   = any(w in script for w in ["ಎಲ್ಲಿ", "ಕೌಂಟರ್", "ಕೊಠಡಿ"])
+        nav_hi   = any(w in text for w in ["kahan", "counter", "room", "कहाँ", "काउंटर", "कमरा"])
+
+        if appt_en or appt_ta or appt_kn or appt_hi:
             intent = "appointment_booking"
-            response = "I can help book an appointment. What health concern should I mention for the visit?"
+            responses = {
+                "ta-IN": "உங்களுக்கு உதவுகிறேன். Appointment பதிவு செய்ய என்ன காரணம் கூற வேண்டும்?",
+                "kn-IN": "ನಾನು ಸಹಾಯ ಮಾಡುತ್ತೇನೆ. Appointment ಬುಕ್ ಮಾಡಲು ಯಾವ ಕಾರಣ ಹೇಳಬೇಕು?",
+                "hi-IN": "मैं help करूँगा। Appointment के लिए किस health problem के बारे में mention करना है?",
+                "en-IN": "I can help book an appointment. What health concern should I mention for the visit?",
+            }
             missing_slots = ["appointment_reason"]
-        elif any(word in text for word in ["ayushman", "cmchis", "insurance", "eligible"]):
+        elif elig_en or elig_hi:
             intent = "eligibility_check"
-            response = "I can do a basic eligibility pre-check. Please share your ABHA ID or registered phone number."
+            responses = {
+                "ta-IN": "உங்களுக்கு உதவுகிறேன். ABHA ID அல்லது பதிவு செய்யப்பட்ட phone number தரவும்.",
+                "kn-IN": "ನಾನು ಸಹಾಯ ಮಾಡುತ್ತೇನೆ. ABHA ID ಅಥವಾ ನೋಂದಾಯಿಸಿದ phone number ಕೊಡಿ.",
+                "hi-IN": "मैं basic eligibility pre-check कर सकता हूँ। अपना ABHA ID या registered phone number बताइए।",
+                "en-IN": "I can do a basic eligibility pre-check. Please share your ABHA ID or registered phone number.",
+            }
             missing_slots = ["abha_id_or_phone"]
-        elif any(word in text for word in ["pregnant", "mother", "anc", "vaccine", "reminder"]) or any(
-            word in tamil_or_kannada
-            for word in ["கர்ப்ப", "தடுப்பூசி", "நினைவூட்டல்", "ಗರ್ಭಿಣಿ", "ಲಸಿಕೆ", "reminder", "ರಿಮೈಂಡರ್"]
-        ):
+        elif maternal_en or maternal_ta or maternal_kn or maternal_hi:
             intent = "maternal_health_reminder"
-            response = "I can set maternal health reminders. Is this for ANC visit, supplements, vaccination, or expected delivery follow-up?"
+            responses = {
+                "ta-IN": "உங்களுக்கு உதவுகிறேன். ANC visit, supplements, vaccination, அல்லது delivery follow-up எது வேண்டும்?",
+                "kn-IN": "ನಾನು ಸಹಾಯ ಮಾಡುತ್ತೇನೆ. ANC visit, supplements, vaccination, ಅಥವಾ delivery follow-up ಯಾವುದು ಬೇಕು?",
+                "hi-IN": "मैं maternal health reminder set कर सकता हूँ। ANC visit, supplements, vaccination, या delivery follow-up — कौनसा चाहिए?",
+                "en-IN": "I can set maternal health reminders. Is this for ANC visit, supplements, vaccination, or expected delivery follow-up?",
+            }
             missing_slots = ["reminder_type"]
-        elif any(word in text for word in ["emergency", "chest pain", "bleeding", "breath"]):
+        elif emerg_en or emerg_hi:
             intent = "emergency"
-            response = "This may be urgent. Please go to the nearest emergency department or call local emergency services now."
+            responses = {
+                "ta-IN": "இது அவசரநிலை போல் தெரிகிறது। உடனே அருகிலுள்ள emergency department-க்கு செல்லுங்கள் அல்லது emergency services-ஐ அழையுங்கள்.",
+                "kn-IN": "ಇದು ತುರ್ತು ಪರಿಸ್ಥಿತಿ ಇರಬಹುದು. ತಕ್ಷಣ ಹತ್ತಿರದ emergency department-ಗೆ ಹೋಗಿ ಅಥವಾ emergency services-ಗೆ ಕರೆ ಮಾಡಿ.",
+                "hi-IN": "यह emergency लग रहा है। तुरंत नजदीकी emergency department जाएँ या emergency services को call करें।",
+                "en-IN": "This may be urgent. Please go to the nearest emergency department or call local emergency services now.",
+            }
             missing_slots = []
-        elif any(word in text for word in ["counter", "floor", "room", "where", "navigation"]) or any(
-            word in tamil_or_kannada
-            for word in ["எங்கே", "கவுண்டர்", "அறை", "ಎಲ್ಲಿ", "ಕೌಂಟರ್", "ಕೊಠಡಿ"]
-        ):
+        elif nav_en or nav_ta or nav_kn or nav_hi:
             intent = "hospital_navigation"
-            response = "I can guide you inside the PHC. Which service do you need: registration, doctor consultation, lab, pharmacy, or maternal health?"
+            responses = {
+                "ta-IN": "உங்களுக்கு உதவுகிறேன். Registration, doctor consultation, lab, pharmacy, அல்லது maternal health — எந்த சேவை வேண்டும்?",
+                "kn-IN": "ನಾನು ಸಹಾಯ ಮಾಡುತ್ತೇನೆ. Registration, doctor consultation, lab, pharmacy, ಅಥವಾ maternal health — ಯಾವ ಸೇವೆ ಬೇಕು?",
+                "hi-IN": "मैं PHC के अंदर guide कर सकता हूँ। Registration, doctor consultation, lab, pharmacy, या maternal health — कौनसी service चाहिए?",
+                "en-IN": "I can guide you inside the PHC. Which service do you need: registration, doctor consultation, lab, pharmacy, or maternal health?",
+            }
             missing_slots = ["service"]
         else:
             intent = "nhm_programme_query"
-            response = "I can answer NHM programme questions and guide you to the right PHC service."
+            responses = {
+                "ta-IN": "NHM programme பற்றிய கேள்விகளுக்கு உதவுகிறேன்.",
+                "kn-IN": "NHM programme ಬಗ್ಗೆ ಸಹಾಯ ಮಾಡುತ್ತೇನೆ.",
+                "hi-IN": "मैं NHM programme के बारे में जवाब दे सकता हूँ।",
+                "en-IN": "I can answer NHM programme questions and guide you to the right PHC service.",
+            }
             missing_slots = ["programme_or_service"]
 
-        if language_code == "ta-IN":
-            response = "உங்களுக்கு உதவுகிறேன். " + response
-        elif language_code == "kn-IN":
-            response = "ನಾನು ಸಹಾಯ ಮಾಡುತ್ತೇನೆ. " + response
+        response = responses.get(language_code, responses["en-IN"])
 
         return {
             "intent": intent,
