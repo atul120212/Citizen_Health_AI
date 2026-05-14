@@ -3,20 +3,17 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Room, RoomEvent, Track } from "livekit-client";
 import {
-  Activity,
   Baby,
-  Bot,
   CalendarClock,
   Hospital,
-  Languages,
   Loader2,
+  MessageSquare,
   Mic,
   PhoneOff,
-  Radio,
   Send,
+  Settings,
   ShieldCheck,
-  UserRound,
-  Volume2
+  X
 } from "lucide-react";
 
 import {
@@ -27,6 +24,9 @@ import {
   postVoiceTurn,
   startSession
 } from "@/lib/api";
+
+// ── Types ──────────────────────────────────────────────────
+type AppState = "idle" | "connecting" | "speaking-intro" | "listening" | "thinking" | "speaking";
 
 type SpeechState = {
   hasSpeech: boolean;
@@ -42,83 +42,141 @@ type ChatEntry = {
   intent?: string;
 };
 
+// ── Quick prompts ──────────────────────────────────────────
 const quickPrompts = [
-  { icon: Hospital, label: "PHC counter", text: "Where is the registration counter?" },
-  { icon: ShieldCheck, label: "Eligibility", text: "Am I eligible for Ayushman Bharat or CMCHIS?" },
-  { icon: CalendarClock, label: "Appointment", text: "Book a doctor appointment for tomorrow morning." },
-  { icon: Baby, label: "ANC reminder", text: "Set my maternal health reminder for ANC visit." }
+  { icon: Hospital,     label: "PHC counter",  text: "Where is the registration counter?" },
+  { icon: ShieldCheck,  label: "Eligibility",  text: "Am I eligible for Ayushman Bharat or CMCHIS?" },
+  { icon: CalendarClock,label: "Appointment",  text: "Book a doctor appointment for tomorrow morning." },
+  { icon: Baby,         label: "ANC reminder", text: "Set my maternal health reminder for ANC visit." }
 ];
 
-// Probe at call-time so the check runs inside a user-gesture context after
-// the browser has fully initialised its codec registry.
+// ── VAD constants ──────────────────────────────────────────
+const SILENCE_MS            = 650;
+const MIN_SPEECH_MS         = 250;
+const MAX_TURN_MS           = 14000;
+const NO_SPEECH_ROLLOVER_MS = 30000;
+const VOICE_THRESHOLD       = 0.022;
+
+// ── Codec probe ────────────────────────────────────────────
 function getSupportedMimeType(): string {
-  const candidates = [
-    "audio/webm;codecs=opus",
-    "audio/webm",
-    "audio/ogg;codecs=opus",
-    "audio/mp4",
-  ];
+  const candidates = ["audio/webm;codecs=opus", "audio/webm", "audio/ogg;codecs=opus", "audio/mp4"];
   for (const type of candidates) {
-    if (typeof MediaRecorder !== "undefined" && MediaRecorder.isTypeSupported(type)) {
-      return type;
-    }
+    if (typeof MediaRecorder !== "undefined" && MediaRecorder.isTypeSupported(type)) return type;
   }
-  return ""; // empty string → browser picks its own default
+  return "";
 }
 
-// VAD tuning — fast silence detection for low latency
-const SILENCE_MS = 650;
-const MIN_SPEECH_MS = 250;
-const MAX_TURN_MS = 14000;
-const NO_SPEECH_ROLLOVER_MS = 30000;
-const VOICE_THRESHOLD = 0.022;
+// ── State → orb visual config ──────────────────────────────
+function orbConfig(state: AppState, voiceLevel: number) {
+  const scale = 1 + Math.min(voiceLevel * 8, 0.45);
+  const ringOpacity = Math.min(0.15 + voiceLevel * 6, 0.8);
 
+  switch (state) {
+    case "listening":
+      return {
+        bg: "radial-gradient(circle at 38% 30%, #2a8f62 0%, #155038 45%, #072418 100%)",
+        ambient: "#3ddc97",
+        ring: `rgba(61,220,151,${ringOpacity})`,
+        scale,
+        haloBorder: "rgba(61,220,151,0.2)",
+        dotColor: "#3ddc97",
+        label: "Listening",
+      };
+    case "thinking":
+      return {
+        bg: "radial-gradient(circle at 38% 30%, #1a4a7a 0%, #0d2d54 45%, #060f1f 100%)",
+        ambient: "#5b9cf6",
+        ring: "rgba(91,156,246,0.3)",
+        scale: 1,
+        haloBorder: "rgba(91,156,246,0.2)",
+        dotColor: "#5b9cf6",
+        label: "Thinking",
+      };
+    case "speaking":
+    case "speaking-intro":
+      return {
+        bg: "radial-gradient(circle at 38% 30%, #6e3ddc 0%, #3d1a8a 45%, #140a2e 100%)",
+        ambient: "#a06ef5",
+        ring: "rgba(160,110,245,0.35)",
+        scale: 1.04 + Math.sin(Date.now() / 300) * 0.02,
+        haloBorder: "rgba(160,110,245,0.2)",
+        dotColor: "#a06ef5",
+        label: "Speaking",
+      };
+    case "connecting":
+      return {
+        bg: "radial-gradient(circle at 38% 30%, #1e6e4c 0%, #0d3d2b 45%, #061a14 100%)",
+        ambient: "#3ddc97",
+        ring: "rgba(61,220,151,0.15)",
+        scale: 1,
+        haloBorder: "rgba(61,220,151,0.1)",
+        dotColor: "#f4c154",
+        label: "Connecting",
+      };
+    default:
+      return {
+        bg: "radial-gradient(circle at 38% 30%, #1e6e4c 0%, #0d3d2b 45%, #061a14 100%)",
+        ambient: "#1f6e4c",
+        ring: "rgba(61,220,151,0.12)",
+        scale: 1,
+        haloBorder: "rgba(61,220,151,0.08)",
+        dotColor: "#3ddc97",
+        label: "Tap to start",
+      };
+  }
+}
+
+// ── Component ──────────────────────────────────────────────
 export function VoiceConsole() {
+  // Citizen settings
   const [phoneNumber, setPhoneNumber] = useState("9000001001");
-  const [fullName, setFullName] = useState("Meena Ravi");
-  const [languageCode, setLanguageCode] = useState("ta-IN");
-  const [district, setDistrict] = useState("Chennai");
-  const [phcName, setPhcName] = useState("T Nagar Urban Primary Health Centre");
-  const [text, setText] = useState("Book a doctor appointment for tomorrow morning.");
+  const [fullName,    setFullName]    = useState("Meena Ravi");
+  const [languageCode,setLanguageCode]= useState("ta-IN");
+  const [district,    setDistrict]    = useState("Chennai");
+  const [phcName,     setPhcName]     = useState("T Nagar Urban Primary Health Centre");
+  const [text,        setText]        = useState("");
 
-  const [status, setStatus] = useState("Ready");
-  const [error, setError] = useState<string | null>(null);
-  const [isLive, setIsLive] = useState(false);
-  const [isProcessingTurn, setIsProcessingTurn] = useState(false);
-  const [roomName, setRoomName] = useState<string | null>(null);
-  const [agentState, setAgentState] = useState("Not connected");
-  const [voiceLevel, setVoiceLevel] = useState(0);
+  // App state machine
+  const [appState,          setAppState]          = useState<AppState>("idle");
+  const [error,             setError]             = useState<string | null>(null);
+  const [voiceLevel,        setVoiceLevel]        = useState(0);
+  const [sessionId,         setSessionId]         = useState<string | null>(null);
+  const [chatHistory,       setChatHistory]       = useState<ChatEntry[]>([]);
+  const [latestAgentText,   setLatestAgentText]   = useState<string>("");
+  const [latestAgentIntent, setLatestAgentIntent] = useState<string>("");
+  const [showChat,          setShowChat]          = useState(false);
+  const [showSettings,      setShowSettings]      = useState(false);
+  const [turn,              setTurn]              = useState<TurnResponse | null>(null);
 
-  // Session and conversation history
-  const [sessionId, setSessionId] = useState<string | null>(null);
-  const [chatHistory, setChatHistory] = useState<ChatEntry[]>([]);
-
-  // Latest turn result (for result-grid display)
-  const [turn, setTurn] = useState<TurnResponse | null>(null);
-
-  const roomRef = useRef<Room | null>(null);
-  const micStreamRef = useRef<MediaStream | null>(null);
-  const recorderRef = useRef<MediaRecorder | null>(null);
-  const chunksRef = useRef<Blob[]>([]);
-  const animationRef = useRef<number | null>(null);
-  const levelAnimRef = useRef<number | null>(null);
-  const speechStateRef = useRef<SpeechState>({
-    hasSpeech: false,
-    lastVoiceAt: 0,
-    startedAt: 0,
-    stopped: false,
-    discard: false
-  });
+  // Refs
+  const roomRef          = useRef<Room | null>(null);
+  const micStreamRef     = useRef<MediaStream | null>(null);
+  const recorderRef      = useRef<MediaRecorder | null>(null);
+  const chunksRef        = useRef<Blob[]>([]);
+  const animRef          = useRef<number | null>(null);
+  const levelAnimRef     = useRef<number | null>(null);
+  const analyserRef      = useRef<AnalyserNode | null>(null);
+  const speechStateRef   = useRef<SpeechState>({ hasSpeech: false, lastVoiceAt: 0, startedAt: 0, stopped: false, discard: false });
   const responseAudioRef = useRef<HTMLAudioElement | null>(null);
-  const remoteAudioRef = useRef<HTMLDivElement | null>(null);
-  const analyserRef = useRef<AnalyserNode | null>(null);
-  const chatEndRef = useRef<HTMLDivElement | null>(null);
+  const remoteAudioRef   = useRef<HTMLDivElement | null>(null);
+  const chatEndRef       = useRef<HTMLDivElement | null>(null);
+  const isLive           = appState !== "idle" && appState !== "connecting";
 
-  // Scroll chat to bottom whenever history grows
+  // Scroll chat to bottom
+  useEffect(() => { chatEndRef.current?.scrollIntoView({ behavior: "smooth" }); }, [chatHistory]);
+
+  // Cleanup on unmount
   useEffect(() => {
-    chatEndRef.current?.scrollIntoView({ behavior: "smooth" });
-  }, [chatHistory]);
+    return () => {
+      stopCurrentRecorder(true);
+      stopLevelMeter();
+      micStreamRef.current?.getTracks().forEach(t => t.stop());
+      roomRef.current?.disconnect();
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
+  // ── Level meter ────────────────────────────────────────────
   const startLevelMeter = useCallback((analyser: AnalyserNode) => {
     analyserRef.current = analyser;
     const data = new Uint8Array(analyser.fftSize);
@@ -126,12 +184,9 @@ export function VoiceConsole() {
       if (!analyserRef.current) return;
       analyser.getByteTimeDomainData(data);
       let sum = 0;
-      for (const v of data) {
-        const c = (v - 128) / 128;
-        sum += c * c;
-      }
+      for (const v of data) { const c = (v - 128) / 128; sum += c * c; }
       const rms = Math.sqrt(sum / data.length);
-      setVoiceLevel((prev) => prev * 0.6 + rms * 0.4);
+      setVoiceLevel(prev => prev * 0.6 + rms * 0.4);
       levelAnimRef.current = requestAnimationFrame(tick);
     };
     levelAnimRef.current = requestAnimationFrame(tick);
@@ -139,20 +194,21 @@ export function VoiceConsole() {
 
   const stopLevelMeter = useCallback(() => {
     analyserRef.current = null;
-    if (levelAnimRef.current) {
-      cancelAnimationFrame(levelAnimRef.current);
-      levelAnimRef.current = null;
-    }
+    if (levelAnimRef.current) { cancelAnimationFrame(levelAnimRef.current); levelAnimRef.current = null; }
     setVoiceLevel(0);
   }, []);
 
+  // ── Chat helpers ───────────────────────────────────────────
   function pushChat(entry: ChatEntry) {
-    setChatHistory((prev) => [...prev, entry]);
+    setChatHistory(prev => [...prev, entry]);
+    if (entry.role === "agent") {
+      setLatestAgentText(entry.text);
+      if (entry.intent) setLatestAgentIntent(entry.intent);
+    }
   }
 
+  // ── Save citizen ───────────────────────────────────────────
   async function saveCitizen() {
-    setError(null);
-    setStatus("Saving citizen");
     await createCitizen({
       phone_number: phoneNumber,
       full_name: fullName,
@@ -160,79 +216,45 @@ export function VoiceConsole() {
       district_name: district,
       phc_name: phcName
     });
-    setStatus(isLive ? "Listening" : "Citizen saved");
   }
 
+  // ── Text turn ──────────────────────────────────────────────
   async function submitText(promptText = text) {
+    if (!promptText.trim()) return;
+    setAppState("thinking");
     setError(null);
-    setStatus("Thinking");
-    const result = await postTextTurn({
-      text: promptText,
-      phone_number: phoneNumber,
-      language_code: languageCode,
-      session_id: sessionId ?? undefined
-    });
+    const result = await postTextTurn({ text: promptText, phone_number: phoneNumber, language_code: languageCode, session_id: sessionId ?? undefined });
     setTurn(result);
     pushChat({ role: "user", text: promptText });
     pushChat({ role: "agent", text: result.response_text, intent: result.intent });
-    await playBulbulAudio(result);
-    setStatus(isLive ? "Listening" : "Ready");
+    setAppState("speaking");
+    await playAudio(result.audio_base64, result.audio_mime_type);
+    setAppState(sessionId ? "listening" : "idle");
   }
 
+  // ── Start / stop realtime ──────────────────────────────────
   async function startRealtime() {
     setError(null);
-
     if (typeof navigator === "undefined" || !navigator.mediaDevices?.getUserMedia) {
-      throw new Error(
-        "Microphone access is not available on this page. " +
-          "Open the app via http://localhost:3001 (or serve over HTTPS) so the browser grants microphone permission."
-      );
+      setError("Microphone access unavailable. Open via http://localhost:3001 or HTTPS.");
+      return;
     }
 
-    // ── 1. Start session → get intro audio ───────────────────────
-    setStatus("Starting session");
-    const session = await startSession({
-      phone_number: phoneNumber,
-      language_code: languageCode
-    });
+    setAppState("connecting");
+
+    const session = await startSession({ phone_number: phoneNumber, language_code: languageCode });
     setSessionId(session.session_id);
     pushChat({ role: "agent", text: session.intro_text });
 
-    // ── 2. Connect to LiveKit ─────────────────────────────────────
-    setStatus("Joining LiveKit");
-    setAgentState("Connecting");
-    const nextRoomName = `citizen-health-${Date.now()}`;
-    const participantName = phoneNumber || `citizen-${Date.now()}`;
-    const token = await createLiveKitToken(nextRoomName, participantName, {
-      phone_number: phoneNumber,
-      language_code: languageCode,
-      full_name: fullName
-    });
-
+    // LiveKit
+    const nextRoom    = `citizen-health-${Date.now()}`;
+    const participant = phoneNumber || `citizen-${Date.now()}`;
+    const token = await createLiveKitToken(nextRoom, participant, { phone_number: phoneNumber, language_code: languageCode, full_name: fullName });
     const room = new Room({ adaptiveStream: true, dynacast: true });
     roomRef.current = room;
-    setRoomName(token.room_name);
 
     room
-      .on(RoomEvent.Connected, () => {
-        setAgentState("LiveKit connected");
-      })
-      .on(RoomEvent.Reconnecting, () => {
-        setAgentState("Reconnecting");
-        setStatus("Reconnecting");
-      })
-      .on(RoomEvent.Reconnected, () => {
-        setAgentState("LiveKit connected");
-        setStatus("Listening");
-      })
-      .on(RoomEvent.Disconnected, () => {
-        setAgentState("Disconnected");
-        setIsLive(false);
-        stopLevelMeter();
-      })
-      .on(RoomEvent.ParticipantConnected, (participant) => {
-        setAgentState(`${participant.identity} joined`);
-      })
+      .on(RoomEvent.Disconnected, () => { setAppState("idle"); stopLevelMeter(); })
       .on(RoomEvent.TrackSubscribed, (track) => {
         if (track.kind === Track.Kind.Audio && remoteAudioRef.current) {
           remoteAudioRef.current.appendChild(track.attach());
@@ -241,38 +263,18 @@ export function VoiceConsole() {
 
     await room.connect(token.url, token.token);
 
-    // ── 3. Play intro audio ───────────────────────────────────────
-    setStatus("Speaking");
-    await playIntroAudio(session);
+    // Intro audio
+    setAppState("speaking-intro");
+    await playAudio(session.audio_base64, session.audio_mime_type);
 
-    // ── 4. Open mic and start VAD ─────────────────────────────────
-    const stream = await navigator.mediaDevices.getUserMedia({
-      audio: { echoCancellation: true, noiseSuppression: true, autoGainControl: true }
-    });
+    // Open mic
+    const stream = await navigator.mediaDevices.getUserMedia({ audio: { echoCancellation: true, noiseSuppression: true, autoGainControl: true } });
     micStreamRef.current = stream;
-
     const [audioTrack] = stream.getAudioTracks();
-    await room.localParticipant.publishTrack(audioTrack, {
-      name: "citizen-microphone",
-      source: Track.Source.Microphone
-    });
+    await room.localParticipant.publishTrack(audioTrack, { name: "citizen-microphone", source: Track.Source.Microphone });
 
-    setIsLive(true);
-    setStatus("Listening");
-    setAgentState("Mic streaming through LiveKit");
+    setAppState("listening");
     startAutoTurnRecorder(stream, session.session_id);
-  }
-
-  async function playIntroAudio(session: { audio_base64: string | null; audio_mime_type: string }) {
-    if (!session.audio_base64) return;
-    responseAudioRef.current?.pause();
-    const audio = new Audio(`data:${session.audio_mime_type};base64,${session.audio_base64}`);
-    responseAudioRef.current = audio;
-    await new Promise<void>((resolve) => {
-      audio.onended = () => resolve();
-      audio.onerror = () => resolve();
-      audio.play().catch(() => resolve());
-    });
   }
 
   async function stopRealtime() {
@@ -280,193 +282,144 @@ export function VoiceConsole() {
     stopLevelMeter();
     responseAudioRef.current?.pause();
     responseAudioRef.current = null;
-    micStreamRef.current?.getTracks().forEach((t) => t.stop());
+    micStreamRef.current?.getTracks().forEach(t => t.stop());
     micStreamRef.current = null;
     await roomRef.current?.disconnect();
     roomRef.current = null;
-    setIsLive(false);
-    setIsProcessingTurn(false);
-    setStatus("Ready");
-    setAgentState("Not connected");
-    setRoomName(null);
     setSessionId(null);
     setChatHistory([]);
+    setLatestAgentText("");
+    setLatestAgentIntent("");
+    setTurn(null);
+    setAppState("idle");
   }
 
+  // ── VAD recorder ──────────────────────────────────────────
   function startAutoTurnRecorder(stream: MediaStream, sid: string) {
     if (!roomRef.current) return;
-
     stopCurrentRecorder();
     chunksRef.current = [];
-    speechStateRef.current = {
-      hasSpeech: false,
-      lastVoiceAt: 0,
-      startedAt: performance.now(),
-      stopped: false,
-      discard: false
-    };
+    speechStateRef.current = { hasSpeech: false, lastVoiceAt: 0, startedAt: performance.now(), stopped: false, discard: false };
 
     const mimeType = getSupportedMimeType();
     const recorder = new MediaRecorder(stream, mimeType ? { mimeType } : {});
     recorderRef.current = recorder;
 
-    const audioContext = new AudioContext();
-    const analyser = audioContext.createAnalyser();
-    const source = audioContext.createMediaStreamSource(stream);
-    source.connect(analyser);
+    const audioCtx = new AudioContext();
+    const analyser = audioCtx.createAnalyser();
+    audioCtx.createMediaStreamSource(stream).connect(analyser);
     startLevelMeter(analyser);
 
-    recorder.ondataavailable = (event) => {
-      if (event.data.size > 0) chunksRef.current.push(event.data);
-    };
+    recorder.ondataavailable = (e) => { if (e.data.size > 0) chunksRef.current.push(e.data); };
 
     recorder.onstop = async () => {
-      cancelAnimationFrameIfNeeded();
+      cancelAnimFrames();
       stopLevelMeter();
-      source.disconnect();
-      await audioContext.close();
+      await audioCtx.close();
 
       const state = speechStateRef.current;
-      const blob = new Blob(chunksRef.current, { type: "audio/webm" });
+      const blob  = new Blob(chunksRef.current, { type: "audio/webm" });
       chunksRef.current = [];
 
       if (state.discard || !roomRef.current || !state.hasSpeech || blob.size < 900) {
         if (roomRef.current) window.setTimeout(() => startAutoTurnRecorder(stream, sid), 150);
         return;
       }
-
       await sendVoiceTurn(blob, sid);
       if (roomRef.current) window.setTimeout(() => startAutoTurnRecorder(stream, sid), 150);
     };
 
     recorder.start(200);
-    monitorSpeechLevel(analyser);
+    monitorSpeech(analyser, stream, sid);
   }
 
-  function monitorSpeechLevel(analyser: AnalyserNode) {
+  function monitorSpeech(analyser: AnalyserNode, stream: MediaStream, sid: string) {
     const data = new Uint8Array(analyser.fftSize);
-
     const tick = () => {
       const recorder = recorderRef.current;
-      const state = speechStateRef.current;
+      const state    = speechStateRef.current;
       if (!recorder || recorder.state !== "recording" || state.stopped) return;
 
       analyser.getByteTimeDomainData(data);
       let sum = 0;
-      for (const value of data) {
-        const c = (value - 128) / 128;
-        sum += c * c;
-      }
+      for (const v of data) { const c = (v - 128) / 128; sum += c * c; }
       const rms = Math.sqrt(sum / data.length);
       const now = performance.now();
 
       if (rms > VOICE_THRESHOLD) {
         if (!state.hasSpeech) state.startedAt = now;
-        state.hasSpeech = true;
+        state.hasSpeech  = true;
         state.lastVoiceAt = now;
-        setStatus("Listening");
+        setAppState("listening");
       }
 
-      const speechDuration = now - state.startedAt;
-      const silenceDuration = now - state.lastVoiceAt;
-      const shouldClose =
-        (state.hasSpeech && speechDuration > MIN_SPEECH_MS && silenceDuration > SILENCE_MS) ||
-        (state.hasSpeech && speechDuration > MAX_TURN_MS) ||
-        (!state.hasSpeech && now - state.startedAt > NO_SPEECH_ROLLOVER_MS);
+      const speechDur  = now - state.startedAt;
+      const silenceDur = now - state.lastVoiceAt;
+      const close =
+        (state.hasSpeech && speechDur > MIN_SPEECH_MS && silenceDur > SILENCE_MS) ||
+        (state.hasSpeech && speechDur > MAX_TURN_MS) ||
+        (!state.hasSpeech && speechDur > NO_SPEECH_ROLLOVER_MS);
 
-      if (shouldClose) {
-        state.stopped = true;
-        recorder.stop();
-        return;
-      }
-
-      animationRef.current = window.requestAnimationFrame(tick);
+      if (close) { state.stopped = true; recorder.stop(); return; }
+      animRef.current = window.requestAnimationFrame(tick);
     };
-
-    animationRef.current = window.requestAnimationFrame(tick);
+    animRef.current = window.requestAnimationFrame(tick);
+    void stream; void sid; // used by onstop closure
   }
 
   async function sendVoiceTurn(blob: Blob, sid: string) {
-    setIsProcessingTurn(true);
-    setStatus("Thinking");
+    setAppState("thinking");
     try {
       const result = await postVoiceTurn(blob, phoneNumber, sid);
       setTurn(result);
-      if (result.transcript) {
-        pushChat({ role: "user", text: result.transcript });
-      }
+      if (result.transcript) pushChat({ role: "user", text: result.transcript });
       pushChat({ role: "agent", text: result.response_text, intent: result.intent });
-      setStatus("Speaking");
-      await playBulbulAudio(result);
+      setAppState("speaking");
+      await playAudio(result.audio_base64, result.audio_mime_type);
     } catch (err) {
       setError(err instanceof Error ? err.message : "Voice turn failed");
-      setStatus("Listening");
     } finally {
-      setIsProcessingTurn(false);
-      if (roomRef.current) setStatus("Listening");
+      if (roomRef.current) setAppState("listening");
     }
   }
 
-  async function playBulbulAudio(result: TurnResponse) {
-    if (!result.audio_base64) return;
+  // ── Audio playback ─────────────────────────────────────────
+  async function playAudio(base64: string | null, mime: string) {
+    if (!base64) return;
     responseAudioRef.current?.pause();
-    const audio = new Audio(`data:${result.audio_mime_type};base64,${result.audio_base64}`);
+    const audio = new Audio(`data:${mime};base64,${base64}`);
     responseAudioRef.current = audio;
-    await new Promise<void>((resolve) => {
+    await new Promise<void>(resolve => {
       audio.onended = () => resolve();
       audio.onerror = () => resolve();
       audio.play().catch(() => resolve());
     });
   }
 
+  // ── Recorder helpers ───────────────────────────────────────
   function stopCurrentRecorder(discard = false) {
-    cancelAnimationFrameIfNeeded();
-    const recorder = recorderRef.current;
+    cancelAnimFrames();
+    const r = recorderRef.current;
     recorderRef.current = null;
-    if (recorder?.state === "recording") {
+    if (r?.state === "recording") {
       speechStateRef.current.stopped = true;
       speechStateRef.current.discard = discard;
-      recorder.stop();
+      r.stop();
     }
   }
 
-  function cancelAnimationFrameIfNeeded() {
-    if (animationRef.current) {
-      window.cancelAnimationFrame(animationRef.current);
-      animationRef.current = null;
-    }
-  }
-
-  async function toggleRealtime() {
-    if (isLive) {
-      await stopRealtime();
-      return;
-    }
-    await startRealtime();
+  function cancelAnimFrames() {
+    if (animRef.current)      { window.cancelAnimationFrame(animRef.current);      animRef.current = null; }
+    if (levelAnimRef.current) { cancelAnimationFrame(levelAnimRef.current); levelAnimRef.current = null; }
   }
 
   async function runSafely(fn: () => Promise<void>) {
-    try {
-      await fn();
-    } catch (err) {
-      setError(err instanceof Error ? err.message : "Request failed");
-      setStatus(isLive ? "Listening" : "Ready");
-      setAgentState(isLive ? "LiveKit connected" : "Not connected");
-    }
+    try { await fn(); }
+    catch (err) { setError(err instanceof Error ? err.message : "Request failed"); setAppState("idle"); }
   }
 
-  useEffect(() => {
-    return () => {
-      stopCurrentRecorder(true);
-      stopLevelMeter();
-      micStreamRef.current?.getTracks().forEach((t) => t.stop());
-      roomRef.current?.disconnect();
-    };
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
-
-  const pulseScale = 1 + Math.min(voiceLevel * 8, 0.45);
-  const pulseOpacity = isLive ? Math.min(0.2 + voiceLevel * 6, 0.7) : 0;
+  // ── Orb visuals ────────────────────────────────────────────
+  const orb = orbConfig(appState, voiceLevel);
 
   const micUnavailable =
     typeof window !== "undefined" &&
@@ -474,49 +427,179 @@ export function VoiceConsole() {
     window.location.hostname !== "localhost" &&
     window.location.hostname !== "127.0.0.1";
 
-  // Audio player for last turn (shown in chat bubble)
-  const audioSrc = useMemo(() => {
-    if (!turn?.audio_base64) return null;
-    return `data:${turn.audio_mime_type};base64,${turn.audio_base64}`;
-  }, [turn]);
+  // Wave bars driven by voiceLevel when agent speaks
+  const waveBars = Array.from({ length: 7 }, (_, i) => {
+    const isSpeaking = appState === "speaking" || appState === "speaking-intro";
+    const h = isSpeaking
+      ? 4 + Math.abs(Math.sin((Date.now() / 200) + i * 0.8)) * 20
+      : appState === "listening"
+        ? 4 + voiceLevel * 120 * Math.abs(Math.sin(i * 1.2))
+        : 4;
+    return h;
+  });
+
+  // Force re-render while speaking/listening to animate waveform
+  const [tick, setTick] = useState(0);
+  useEffect(() => {
+    if (appState === "speaking" || appState === "speaking-intro" || appState === "listening") {
+      const id = window.setInterval(() => setTick(t => t + 1), 60);
+      return () => window.clearInterval(id);
+    }
+  }, [appState]);
+  void tick;
+
+  const latestVisible = latestAgentText.length > 0;
 
   return (
-    <main className="shell">
+    <div className="gl-shell">
+      {/* Insecure origin banner */}
       {micUnavailable && (
-        <div className="insecure-banner">
-          Microphone access requires a secure origin. Open the app at{" "}
-          <strong>http://localhost:3001</strong> in the browser on this machine, or serve over HTTPS.
+        <div className="gl-insecure">
+          Mic requires secure origin — open at <strong>http://localhost:3001</strong> or via HTTPS.
         </div>
       )}
-      <header className="topbar">
-        <div>
-          <p className="eyebrow">Module 1</p>
+
+      {/* Top bar */}
+      <header className="gl-topbar">
+        <div className="gl-wordmark">
+          <div className="gl-wordmark-dot" />
           <h1>Citizen Health AI</h1>
         </div>
-        <div className="status-pill">
-          {isProcessingTurn ? <Loader2 className="spin" size={16} /> : <Radio size={16} />}
-          <span>{status}</span>
+        <div className="gl-topbar-actions">
+          {chatHistory.length > 0 && (
+            <button className="gl-icon-btn" aria-label="History" onClick={() => setShowChat(v => !v)}>
+              <MessageSquare size={18} />
+            </button>
+          )}
+          <button className="gl-icon-btn" aria-label="Settings" onClick={() => setShowSettings(v => !v)}>
+            <Settings size={18} />
+          </button>
         </div>
       </header>
 
-      <section className="workspace">
-        {/* ── Left panel: citizen profile ───────────────────────── */}
-        <aside className="profile-panel">
-          <div className="panel-heading">
-            <UserRound size={18} />
-            <h2>Citizen</h2>
+      {/* Center stage */}
+      <main className="gl-stage">
+        {/* Ambient glow */}
+        <div className="gl-ambient" style={{ background: orb.ambient }} />
+
+        {/* Orb */}
+        <div className="gl-orb-wrapper">
+          <div
+            className="gl-orb"
+            role="button"
+            aria-label={isLive ? "End session" : "Start session"}
+            onClick={() => runSafely(isLive ? stopRealtime : startRealtime)}
+            style={{ transform: `scale(${orb.scale})` }}
+          >
+            <div className="gl-orb-core" style={{ background: orb.bg }} />
+            <div className="gl-orb-shine" />
+            <div className="gl-orb-ring" style={{ borderColor: orb.ring }} />
+            <div className="gl-halo" style={{ borderColor: orb.haloBorder }} />
+
+            {/* Center icon */}
+            <div className="gl-orb-icon">
+              {appState === "connecting" || appState === "thinking" ? (
+                <Loader2 size={40} color="rgba(255,255,255,0.6)" className="spin" />
+              ) : isLive ? (
+                <PhoneOff size={34} color="rgba(255,255,255,0.5)" />
+              ) : (
+                <Mic size={40} color="rgba(255,255,255,0.7)" />
+              )}
+            </div>
+          </div>
+
+          {/* Status label */}
+          <div className="gl-status-label">
+            <div className="gl-status-dot" style={{ background: orb.dotColor }} />
+            {orb.label}
+          </div>
+
+          {/* Waveform */}
+          <div className="gl-wave">
+            {waveBars.map((h, i) => (
+              <div key={i} className="gl-wave-bar" style={{ height: `${h}px`, opacity: isLive ? 0.7 : 0.2 }} />
+            ))}
+          </div>
+        </div>
+
+        {/* Latest agent transcript */}
+        <div className="gl-transcript">
+          <div className={`gl-transcript-text ${latestVisible ? "visible" : ""}`}>
+            {latestAgentIntent && (
+              <span className="gl-transcript-intent">{latestAgentIntent.replace(/_/g, " ")}</span>
+            )}
+            {latestAgentText}
+          </div>
+        </div>
+
+        {error && <div className="gl-error">{error}</div>}
+      </main>
+
+      {/* Bottom toolbar */}
+      <footer className="gl-bottom">
+        {/* Quick chips — hidden while live */}
+        {!isLive && (
+          <div className="gl-chips">
+            {quickPrompts.map(p => {
+              const Icon = p.icon;
+              return (
+                <button key={p.label} className="gl-chip" onClick={() => { setText(p.text); runSafely(() => submitText(p.text)); }}>
+                  <Icon size={14} />
+                  {p.label}
+                </button>
+              );
+            })}
+          </div>
+        )}
+
+        {/* Text input */}
+        <div className="gl-text-row">
+          <input
+            className="gl-text-input"
+            placeholder="Type a message…"
+            value={text}
+            onChange={e => setText(e.target.value)}
+            onKeyDown={e => { if (e.key === "Enter") runSafely(() => submitText()); }}
+          />
+          <button
+            className="gl-send-btn"
+            disabled={!text.trim() || appState === "thinking" || appState === "connecting"}
+            onClick={() => runSafely(() => submitText())}
+            aria-label="Send"
+          >
+            {appState === "thinking" ? <Loader2 size={16} className="spin" /> : <Send size={16} />}
+          </button>
+        </div>
+
+        {/* End call button while live */}
+        {isLive && (
+          <button className="gl-end-btn" onClick={() => runSafely(stopRealtime)}>
+            <PhoneOff size={18} /> End session
+          </button>
+        )}
+      </footer>
+
+      {/* Hidden LiveKit remote audio container */}
+      <div ref={remoteAudioRef} style={{ display: "none" }} />
+
+      {/* ── Settings drawer ───────────────────────────────── */}
+      <div className={`gl-settings-overlay ${showSettings ? "open" : ""}`} onClick={e => { if (e.target === e.currentTarget) setShowSettings(false); }}>
+        <div className="gl-settings-drawer">
+          <div className="gl-settings-title">
+            <span>Settings</span>
+            <button className="gl-icon-btn" onClick={() => setShowSettings(false)}><X size={16} /></button>
           </div>
           <label>
             Phone
-            <input value={phoneNumber} onChange={(e) => setPhoneNumber(e.target.value)} />
+            <input value={phoneNumber} onChange={e => setPhoneNumber(e.target.value)} />
           </label>
           <label>
             Name
-            <input value={fullName} onChange={(e) => setFullName(e.target.value)} />
+            <input value={fullName} onChange={e => setFullName(e.target.value)} />
           </label>
           <label>
             Language
-            <select value={languageCode} onChange={(e) => setLanguageCode(e.target.value)}>
+            <select value={languageCode} onChange={e => setLanguageCode(e.target.value)}>
               <option value="ta-IN">Tamil</option>
               <option value="kn-IN">Kannada</option>
               <option value="en-IN">English</option>
@@ -524,174 +607,46 @@ export function VoiceConsole() {
           </label>
           <label>
             District
-            <input value={district} onChange={(e) => setDistrict(e.target.value)} />
+            <input value={district} onChange={e => setDistrict(e.target.value)} />
           </label>
           <label>
             PHC
-            <input value={phcName} onChange={(e) => setPhcName(e.target.value)} />
+            <input value={phcName} onChange={e => setPhcName(e.target.value)} />
           </label>
-          <button className="secondary-button" onClick={() => runSafely(saveCitizen)}>
-            <ShieldCheck size={17} />
-            Save
+          <button className="gl-save-btn" onClick={() => runSafely(saveCitizen)}>
+            <ShieldCheck size={17} /> Save citizen
           </button>
-        </aside>
-
-        {/* ── Centre panel: voice + chat ────────────────────────── */}
-        <section className="assistant-panel">
-          <div className="intent-strip">
-            {quickPrompts.map((prompt) => {
-              const Icon = prompt.icon;
-              return (
-                <button
-                  className="quick-chip"
-                  key={prompt.label}
-                  onClick={() => {
-                    setText(prompt.text);
-                    runSafely(() => submitText(prompt.text));
-                  }}
-                >
-                  <Icon size={16} />
-                  {prompt.label}
-                </button>
-              );
-            })}
-          </div>
-
-          {/* Mic + language line */}
-          <div className="voice-stage">
-            <div className="mic-wrapper">
-              <div
-                className="pulse-ring"
-                style={{
-                  transform: `scale(${pulseScale})`,
-                  opacity: pulseOpacity,
-                  background: isLive ? "var(--coral)" : "var(--green)"
-                }}
-              />
-              <button
-                aria-label={isLive ? "End realtime voice session" : "Start realtime voice session"}
-                className={isLive ? "record-button recording" : "record-button"}
-                onClick={() => runSafely(toggleRealtime)}
-              >
-                {isLive ? <PhoneOff size={36} /> : <Mic size={40} />}
-              </button>
-            </div>
-            <div className="stage-copy">
-              <div className="language-line">
-                <Languages size={17} />
-                <span>{languageCode}</span>
-              </div>
-              <p className="stage-hint">
-                {isLive
-                  ? "Listening — speak naturally. Silence ends each turn automatically."
-                  : "Tap the mic to start. The agent will introduce itself, then listen."}
-              </p>
-              {audioSrc && <audio controls src={audioSrc} />}
-            </div>
-          </div>
-
-          {/* Conversation history */}
-          {chatHistory.length > 0 && (
-            <div className="chat-history">
-              {chatHistory.map((entry, i) => (
-                <div key={i} className={`chat-bubble chat-bubble--${entry.role}`}>
-                  <div className="chat-avatar">
-                    {entry.role === "agent" ? <Bot size={15} /> : <UserRound size={15} />}
-                  </div>
-                  <div className="chat-body">
-                    {entry.intent && entry.role === "agent" && (
-                      <span className="chat-intent">{entry.intent.replace(/_/g, " ")}</span>
-                    )}
-                    <p>{entry.text}</p>
-                  </div>
-                </div>
-              ))}
-              <div ref={chatEndRef} />
-            </div>
-          )}
-
-          {/* Text test row */}
-          <div className="text-row">
-            <input value={text} onChange={(e) => setText(e.target.value)} />
-            <button className="primary-button" onClick={() => runSafely(() => submitText())}>
-              <Send size={17} />
-              Test
-            </button>
-          </div>
-
-          {/* Latest turn metadata */}
           {turn && (
-            <div className="result-grid">
-              <div>
-                <span>Transcript</span>
-                <p>{turn.transcript}</p>
-              </div>
-              <div>
-                <span>Intent</span>
-                <p>{turn.intent}</p>
-              </div>
-              <div>
-                <span>Interaction</span>
-                <p>{turn.interaction_id || "local"}</p>
-              </div>
-              <div>
-                <span>Database</span>
-                <p>{turn.db_configured ? "Supabase" : "demo"}</p>
-              </div>
-            </div>
+            <>
+              <hr style={{ borderColor: "var(--line)", margin: "4px 0" }} />
+              <small style={{ color: "var(--muted)", fontSize: "0.75rem" }}>
+                Session: {sessionId ? sessionId.slice(0, 8) + "…" : "None"}<br />
+                Intent: {turn.intent}<br />
+                DB: {turn.db_configured ? "Supabase" : "demo"}
+              </small>
+            </>
           )}
+        </div>
+      </div>
 
-          {turn?.actions?.length ? (
-            <pre className="actions">{JSON.stringify(turn.actions, null, 2)}</pre>
-          ) : null}
-
-          {error && <div className="error-box">{error}</div>}
-        </section>
-
-        {/* ── Right panel: realtime state ───────────────────────── */}
-        <aside className="livekit-panel">
-          <div className="panel-heading">
-            <Activity size={18} />
-            <h2>Realtime State</h2>
-          </div>
-          <div className="metric">
-            <span>Transport</span>
-            <strong>{agentState}</strong>
-          </div>
-          <div className="metric">
-            <span>Room</span>
-            <strong>{roomName || "None"}</strong>
-          </div>
-          <div className="metric">
-            <span>Session</span>
-            <strong>{sessionId ? sessionId.slice(0, 8) + "…" : "None"}</strong>
-          </div>
-          <div className="metric">
-            <span>Turn mode</span>
-            <strong>{isLive ? "Auto VAD" : "Idle"}</strong>
-          </div>
-          <div className="metric">
-            <span>Voice</span>
-            <strong>Bulbul TTS</strong>
-          </div>
-          {isLive && (
-            <div className="metric">
-              <span>Mic level</span>
-              <div className="level-bar-track">
-                <div
-                  className="level-bar-fill"
-                  style={{ width: `${Math.min(voiceLevel * 400, 100)}%` }}
-                />
-              </div>
+      {/* ── Chat history panel ────────────────────────────── */}
+      <div className={`gl-chat-panel ${showChat ? "open" : ""}`}>
+        <div className="gl-chat-header">
+          <span>Conversation</span>
+          <button className="gl-icon-btn" onClick={() => setShowChat(false)}><X size={16} /></button>
+        </div>
+        <div className="gl-chat-messages">
+          {chatHistory.map((entry, i) => (
+            <div key={i} className={`gl-msg gl-msg--${entry.role}`}>
+              {entry.intent && entry.role === "agent" && (
+                <span className="gl-msg-intent">{entry.intent.replace(/_/g, " ")}</span>
+              )}
+              <div className="gl-msg-bubble">{entry.text}</div>
             </div>
-          )}
-          <div className="remote-audio" ref={remoteAudioRef} />
-          <div className="signal-row">
-            <Volume2 size={16} />
-            <span>{isLive ? "Microphone is publishing to LiveKit" : "Click mic to start"}</span>
-          </div>
-        </aside>
-      </section>
-    </main>
+          ))}
+          <div ref={chatEndRef} />
+        </div>
+      </div>
+    </div>
   );
 }
