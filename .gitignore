@@ -1,13 +1,50 @@
+# Environment Files
 .env
+.env*
+!.env.example
+frontend/.env.local
+backend/.env
+
+# Python Virtual Environments & Packages
 .venv/
+venv/
+env/
+ENV/
 __pycache__/
 *.py[cod]
+*$py.class
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+*.pyc
 
+# Node & Frontend Build Outputs
 node_modules/
 .next/
 out/
 dist/
+build/
+.cache/
+tsconfig.tsbuildinfo
 
+# OS & IDE Files
 .DS_Store
+Thumbs.db
+.vscode/
+.idea/
+*.suo
+*.ntvs*
+*.njsproj
+*.sln
+*.swp
+
+# Logs & Temp Files
 *.log
-.env.example
+debug-*.log
+backend/scratch/
+scratch/
+temp/
+tmp/
+
+# Custom Binaries & Presentations (Generated)
+*.pptx

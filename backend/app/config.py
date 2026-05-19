@@ -34,6 +34,8 @@ class Settings(BaseSettings):
     smtp_password: str | None = None
     smtp_from: str = "Citizen Health AI <noreply@citizenhealth.ai>"
 
+    admin_api_key: str | None = None
+
     model_config = SettingsConfigDict(env_file=(".env", "../.env"), env_file_encoding="utf-8", extra="ignore")
 
 

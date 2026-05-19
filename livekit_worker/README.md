@@ -1,6 +1,8 @@
 # LiveKit Worker
 
-This worker registers a realtime agent named `citizen-health-ai` and joins LiveKit rooms. It uses LiveKit's streaming pipeline for room audio, then routes citizen-health turns through the FastAPI backend using the `citizen_health_turn` tool.
+This worker registers a realtime agent named `citizen-health-ai` and joins LiveKit rooms when the frontend requests a token (automatic agent dispatch).
+
+Every spoken turn is routed through **`POST /api/voice/text-turn`** on the FastAPI backend so intents, session state, and Sarvam replies stay accurate.
 
 The IVR endpoint in `backend/` is the strict Sarvam path:
 

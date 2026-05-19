@@ -78,5 +78,9 @@ async def fetch_all(query: str, params: Sequence[Any] | None = None) -> list[dic
             return [_normalise_row(r) for r in rows]
 
 
-async def execute(query: str, params: Sequence[Any] | None = None) -> dict[str, Any] | None:
-    return await fetch_one(query, params)
+async def execute(query: str, params: Sequence[Any] | None = None) -> None:
+    if pool is None:
+        return
+    async with pool.connection() as conn:
+        async with conn.cursor() as cur:
+            await cur.execute(query, params or ())

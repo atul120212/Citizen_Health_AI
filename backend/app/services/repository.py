@@ -17,6 +17,19 @@ async def get_citizen_by_phone(phone_number: str) -> dict[str, Any] | None:
     )
 
 
+async def get_health_worker_by_phone(phone_number: str) -> dict[str, Any] | None:
+    return await db.fetch_one(
+        """
+        SELECT hw.*, l.district_name, l.phc_name
+        FROM health_workers hw
+        LEFT JOIN locations l ON l.id = hw.location_id
+        WHERE hw.phone_number = %s
+        """,
+        (phone_number,),
+    )
+
+
+
 async def upsert_citizen(payload: CitizenUpsert) -> dict[str, Any] | None:
     location_id = None
     if payload.district_name or payload.phc_name or payload.village_taluka:
@@ -47,17 +60,23 @@ async def upsert_citizen(payload: CitizenUpsert) -> dict[str, Any] | None:
 
 
 async def get_nearest_departments(query: str | None = None) -> list[dict[str, Any]]:
-    search = f"%{query or ''}%"
+    if not query or not query.strip():
+        search = "%%"
+        is_empty = True
+    else:
+        search = f"%{query.strip()}%"
+        is_empty = False
+
     return await db.fetch_all(
         """
         SELECT hd.*, l.district_name, l.phc_name
         FROM hospital_departments hd
         LEFT JOIN locations l ON l.id = hd.location_id
-        WHERE %s = '%%' OR hd.department_name ILIKE %s OR hd.services ILIKE %s
+        WHERE %s OR hd.department_name ILIKE %s OR hd.services ILIKE %s
         ORDER BY hd.department_name
         LIMIT 6
         """,
-        (search, search, search),
+        (is_empty, search, search),
     )
 
 
@@ -174,4 +193,45 @@ async def set_ayushman_precheck(citizen_id: str, is_eligible: bool) -> dict[str,
         RETURNING *
         """,
         (is_eligible, citizen_id),
+    )
+
+
+async def log_patient_vital(citizen_id: str, vital_type: str, value: float, unit: str | None = None) -> dict[str, Any] | None:
+    return await db.fetch_one(
+        """
+        INSERT INTO patient_vitals_log (citizen_id, vital_type, value, unit)
+        VALUES (%s, %s, %s, %s)
+        RETURNING *
+        """,
+        (citizen_id, vital_type, value, unit),
+    )
+
+
+async def update_medication_adherence(citizen_id: str, med_name: str) -> dict[str, Any] | None:
+    # First, try to find the medication. If not exists, create a dummy one for tracking.
+    med = await db.fetch_one(
+        "SELECT id FROM medication_schedules WHERE citizen_id = %s AND medication_name ILIKE %s",
+        (citizen_id, med_name),
+    )
+    
+    if not med:
+        return await db.fetch_one(
+            """
+            INSERT INTO medication_schedules (citizen_id, medication_name, last_taken_at, adherence_count)
+            VALUES (%s, %s, NOW(), 1)
+            RETURNING *
+            """,
+            (citizen_id, med_name),
+        )
+    
+    return await db.fetch_one(
+        """
+        UPDATE medication_schedules
+        SET last_taken_at = NOW(),
+            adherence_count = adherence_count + 1,
+            updated_at = NOW()
+        WHERE id = %s
+        RETURNING *
+        """,
+        (med["id"],),
     )

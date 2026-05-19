@@ -1,5 +1,6 @@
 livekit-agents[inference]~=1.5
 livekit-plugins-silero~=1.5
 livekit-plugins-turn-detector~=1.5
+livekit-plugins-sarvam~=1.5
 python-dotenv==1.0.1
 httpx==0.28.1

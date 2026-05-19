@@ -138,8 +138,9 @@ async def send_appointment_confirmation(
     settings = get_settings()
     msg = _build_message(to_email, patient_name, reason, date, time, phc, language_code)
 
-    if not settings.smtp_user or not settings.smtp_password:
-        # Demo mode — just log so devs can verify the content
+    _placeholder = "your-app-password"
+    if not settings.smtp_user or not settings.smtp_password or settings.smtp_password == _placeholder:
+        # Demo mode — just log so devs can verify the content without real SMTP
         logger.info(
             "[EMAIL DEMO] To: %s | Subject: %s\n%s",
             to_email,

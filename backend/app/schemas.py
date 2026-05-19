@@ -4,7 +4,7 @@ from typing import Literal
 from pydantic import BaseModel, Field
 
 
-LanguageCode = Literal["ta-IN", "kn-IN", "en-IN"]
+LanguageCode = Literal["ta-IN", "kn-IN", "en-IN", "hi-IN", "bho-IN"]
 
 
 class CitizenUpsert(BaseModel):
@@ -22,6 +22,8 @@ class AppointmentCreate(BaseModel):
     worker_id: str | None = None
     appointment_date: datetime
     reason: str
+    email: str | None = None
+    language_code: str = "en-IN"
 
 
 class SessionStartRequest(BaseModel):
@@ -34,6 +36,17 @@ class SessionStartResponse(BaseModel):
     intro_text: str
     audio_base64: str | None = None
     audio_mime_type: str = "audio/wav"
+
+
+class SessionSummaryResponse(BaseModel):
+    session_id: str
+    citizen: dict | None = None
+    verification_state: str = "pending"
+    language_code: str | None = None
+    turns: int = 0
+    call_summary: str | None = None
+    started_at: str | None = None
+    history_length: int = 0
 
 
 class TextTurnRequest(BaseModel):
@@ -67,3 +80,4 @@ class LiveKitTokenResponse(BaseModel):
     token: str
     url: str
     room_name: str
+    agent_name: str | None = None
